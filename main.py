@@ -61,11 +61,9 @@ class IsingLattice:
         trial.lattice[rand_y][rand_x] *= -1  # Flip a single spin
         deltaE = trial.energy_periodic() - self.energy_periodic()
         if deltaE > 0:
-            return False
-        else:
             r = random.random()
             w = np.exp((-1 / self.kT) * deltaE)
-            if w > r:
+            if r > w:
                 return False
         self.lattice = trial.lattice
         self.magnetization.append(self.cur_magnetization())
@@ -79,7 +77,7 @@ class IsingLattice:
 
 
 if __name__ == '__main__':
-    kt = np.linspace(0, 100, 25)
+    kt = np.linspace(0.1, 100, 25)
     m = []
     E = []
     C_v = []
@@ -89,11 +87,11 @@ if __name__ == '__main__':
         m_bar, m_var, e_bar, e_var = ising.start()
         m.append(m_bar)
         E.append(e_bar)
-        C_v.append((e_var - e_bar ** 2) / t ** 2)
+        C_v.append(e_var / t ** 2)
 
     plt.plot(kt, m)
     plt.show()
     plt.plot(kt, E)
     plt.show()
-    plt.plot(kt,C_v)
+    plt.plot(kt, C_v)
     plt.show()
