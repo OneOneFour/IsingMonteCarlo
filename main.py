@@ -14,11 +14,14 @@ class IsingLattice:
         else:
             self.lattice = [[random.choice((-1, 1)) for i in range(self.width)] for j in range(self.height)]
 
+        self.magnetization = []
+        self.energy = []
+
     def energy_periodic(self):
         E = 0
         for y in range(len(self.lattice)):
             for x in range(len(self.lattice[y])):
-                E += self.lattice[y][x] * (
+                E += - 1 * self.lattice[y][x] * (
                         self.lattice[(y + 1) % self.height][x] +
                         self.lattice[(y - 1) % self.height][x] +
                         self.lattice[y][(x + 1) % self.width] +
@@ -43,39 +46,54 @@ class IsingLattice:
         ax.imshow(self.lattice, cmap='jet')
         plt.show()
 
-    def magnetization(self):
+    def cur_magnetization(self):
         magnetization = 0
         for row in self.lattice:
             for spin in row:
                 magnetization += spin
-        return magnetization
+        return magnetization / (self.width * self.height)
 
         # Flip the configuration spin
 
-
-def metropolis_step(baseIsing):
-    i=0
-    while True:
-        trial = copy.deepcopy(baseIsing)
+    def __metropolis_step(self):
+        trial = copy.deepcopy(self)
         rand_x, rand_y = random.randint(0, 49), random.randint(0, 49)
-        trial.lattice[rand_y][rand_x] *= -1
-        deltaE = trial.energy_periodic() - baseIsing.energy_periodic()
-
-        if deltaE <= 0:
-            baseIsing = trial
+        trial.lattice[rand_y][rand_x] *= -1  # Flip a single spin
+        deltaE = trial.energy_periodic() - self.energy_periodic()
+        if deltaE > 0:
+            return False
         else:
             r = random.random()
-            w = np.exp((-1 / baseIsing.kT) * deltaE)
-            if r < w:
-                baseIsing = trial
+            w = np.exp((-1 / self.kT) * deltaE)
+            if w > r:
+                return False
+        self.lattice = trial.lattice
+        self.magnetization.append(self.cur_magnetization())
+        self.energy.append(self.energy_periodic())
+        return True
 
-        i+=1
-        if i % 200 == 0:
-            baseIsing.showlattice()
-
+    def start(self, max_iter=5000):
+        for i in range(max_iter):
+            self.__metropolis_step()
+        return np.mean(self.magnetization), np.var(self.magnetization), np.mean(self.energy), np.var(self.energy)
 
 
 if __name__ == '__main__':
-    ising = IsingLattice(50, 50, 200)
-    ising.showlattice()
-    metropolis_step(ising)
+    kt = np.linspace(0, 100, 25)
+    m = []
+    E = []
+    C_v = []
+    chi = []
+    for t in kt:
+        ising = IsingLattice(50, 50, t)
+        m_bar, m_var, e_bar, e_var = ising.start()
+        m.append(m_bar)
+        E.append(e_bar)
+        C_v.append((e_var - e_bar ** 2) / t ** 2)
+
+    plt.plot(kt, m)
+    plt.show()
+    plt.plot(kt, E)
+    plt.show()
+    plt.plot(kt,C_v)
+    plt.show()
