@@ -1,9 +1,9 @@
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-import copy
+import pickle
 from tqdm import tqdm
-
+from timeit import default_timer as timer
 
 class IsingLattice:
     def __init__(self, width, height, kT, cold=True):
@@ -22,7 +22,7 @@ class IsingLattice:
         E = 0
         for y in range(len(self.lattice)):
             for x in range(len(self.lattice[y])):
-                E += - 0.5 * self.lattice[y][x] * (
+                E += -1 * self.lattice[y][x] * (
                         self.lattice[(y + 1) % self.height][x] +
                         self.lattice[(y - 1) % self.height][x] +
                         self.lattice[y][(x + 1) % self.width] +
@@ -34,12 +34,12 @@ class IsingLattice:
         E = 0
         for y in range(len(self.lattice)):
             for x in range(len(self.lattice[y])):  # Use nearest neighbouring 4 cells
-                E += self.lattice[y][x] * (
-                        (self.lattice[y + 1][x] if self.lattice[y + 1][x] < self.height else 0) +
-                        (self.lattice[y - 1][x] if self.lattice[y - 1][x] >= 0 else 0) +
-                        (self.lattice[y][x + 1] if self.lattice[y + 1][x] < self.width else 0) +
-                        (self.lattice[y][x - 1] if self.lattice[y + 1][x] >= 0 else 0)
-                )
+                    E += self.lattice[y][x] * (
+                            (self.lattice[y + 1][x] if self.lattice[y + 1][x] < self.height else 0) +
+                            (self.lattice[y - 1][x] if self.lattice[y - 1][x] >= 0 else 0) +
+                            (self.lattice[y][x + 1] if self.lattice[y + 1][x] < self.width else 0) +
+                            (self.lattice[y][x - 1] if self.lattice[y + 1][x] >= 0 else 0)
+                    )
         return E
 
     def showlattice(self):
@@ -56,25 +56,32 @@ class IsingLattice:
 
         # Flip the configuration spin
 
-    def __metropolis_step(self, f=0, im=None,max_iter=5000):
-        if f >= max_iter - 1:
-            plt.close()
-        print(f"\rFrame:{f} of 5000",end='')
-        trial = copy.deepcopy(self)
-        rand_x, rand_y = random.randint(0, self.width - 1), random.randint(0, self.height - 1)
-        trial.lattice[rand_y][rand_x] *= -1  # Flip a single spin
-        deltaE = trial.energy_periodic() - self.energy_periodic()
-        if deltaE > 0:
-            r = random.random()
-            w = np.exp((-1 / self.kT) * deltaE)
-            if r > w:
-                return im,
-        self.lattice = trial.lattice
-        self.magnetization.append(self.cur_magnetization())
-        self.energy.append(self.energy_periodic())
+    def __metropolis_step(self, f=0, im=None, max_iter=5000):
         if im:
-            im.set_array(self.lattice)
-
+            if f >= max_iter - 1:
+                plt.close()
+            # print(f"\rFrame:{f} of 5000", end='')
+        while True:
+            trial = pickle.loads(pickle.dumps(self.lattice))
+            rand_y,rand_x = random.randint(0,self.height -1),random.randint(0,self.width -1 )
+            trial[rand_y][rand_x] *= -1  # Flip a single spin
+            deltaE = 2*self.lattice[rand_y][rand_x]* (
+                        self.lattice[(rand_y + 1) % self.height][rand_x] +
+                        self.lattice[(rand_y - 1) % self.height][rand_x] +
+                        self.lattice[rand_y][(rand_x + 1) % self.width] +
+                        self.lattice[rand_y][(rand_x - 1) % self.width]
+            )
+            if deltaE <= 0:
+                break
+            r = random.random()
+            w = np.exp((-1/self.kT) * deltaE)
+            if r <= w:
+                break
+        self.lattice = trial
+        self.magnetization.append(self.magnetization[-1] + 2*self.lattice[rand_y][rand_x])
+        self.energy.append(self.energy[-1] + deltaE)
+        if im:
+            im.set_data(self.lattice)
         return im,
 
     def start(self, max_iter=5000):
@@ -86,9 +93,10 @@ class IsingLattice:
         import matplotlib.animation as animation
         fig, ax = plt.subplots()
 
-        im = ax.imshow(self.lattice, cmap='jet', animated=True,vmin=-1,vmax=1)
+        im = plt.imshow(self.lattice, cmap='jet', animated=True, vmin=-1, vmax=1)
 
-        animation.FuncAnimation(fig, self.__metropolis_step, fargs=(im,max_iter,), blit=True, frames=max_iter, interval=1,
+        animation.FuncAnimation(fig, self.__metropolis_step, fargs=(im, max_iter,), blit=True, frames=max_iter,
+                                interval=0,
                                 repeat=False)
         plt.show()
         return np.mean(self.magnetization), np.var(self.magnetization), np.mean(self.energy), np.var(self.energy)
@@ -96,7 +104,7 @@ class IsingLattice:
 
 if __name__ == '__main__':
     # np.seterr(all='raise')
-    kt = np.linspace(0.1, 100, 10)
+    kt = np.linspace(1.8, 2.6, 5)
     m = []
     E = []
     C_v = []
@@ -104,7 +112,7 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(50, 50, t)
-        m_bar, m_var, e_bar, e_var = ising.start_anim()
+        m_bar, m_var, e_bar, e_var = ising.start_anim(10000)
         m.append(m_bar)
         E.append(e_bar)
         C_v.append(e_var / t ** 2)
