@@ -2,6 +2,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
+from tqdm import tqdm
 
 
 class IsingLattice:
@@ -14,14 +15,14 @@ class IsingLattice:
         else:
             self.lattice = [[random.choice((-1, 1)) for i in range(self.width)] for j in range(self.height)]
 
-        self.magnetization = []
-        self.energy = []
+        self.magnetization = [self.cur_magnetization()]
+        self.energy = [self.energy_periodic()]
 
     def energy_periodic(self):
         E = 0
         for y in range(len(self.lattice)):
             for x in range(len(self.lattice[y])):
-                E += - 1 * self.lattice[y][x] * (
+                E += - 0.5 * self.lattice[y][x] * (
                         self.lattice[(y + 1) % self.height][x] +
                         self.lattice[(y - 1) % self.height][x] +
                         self.lattice[y][(x + 1) % self.width] +
@@ -55,36 +56,55 @@ class IsingLattice:
 
         # Flip the configuration spin
 
-    def __metropolis_step(self):
+    def __metropolis_step(self, f=0, im=None,max_iter=5000):
+        if f >= max_iter - 1:
+            plt.close()
+        print(f"\rFrame:{f} of 5000",end='')
         trial = copy.deepcopy(self)
-        rand_x, rand_y = random.randint(0, 49), random.randint(0, 49)
+        rand_x, rand_y = random.randint(0, self.width - 1), random.randint(0, self.height - 1)
         trial.lattice[rand_y][rand_x] *= -1  # Flip a single spin
         deltaE = trial.energy_periodic() - self.energy_periodic()
         if deltaE > 0:
             r = random.random()
             w = np.exp((-1 / self.kT) * deltaE)
             if r > w:
-                return False
+                return im,
         self.lattice = trial.lattice
         self.magnetization.append(self.cur_magnetization())
         self.energy.append(self.energy_periodic())
-        return True
+        if im:
+            im.set_array(self.lattice)
+
+        return im,
 
     def start(self, max_iter=5000):
-        for i in range(max_iter):
+        for i in tqdm(range(max_iter)):
             self.__metropolis_step()
+        return np.mean(self.magnetization), np.var(self.magnetization), np.mean(self.energy), np.var(self.energy)
+
+    def start_anim(self, max_iter=5000):
+        import matplotlib.animation as animation
+        fig, ax = plt.subplots()
+
+        im = ax.imshow(self.lattice, cmap='jet', animated=True,vmin=-1,vmax=1)
+
+        animation.FuncAnimation(fig, self.__metropolis_step, fargs=(im,max_iter,), blit=True, frames=max_iter, interval=1,
+                                repeat=False)
+        plt.show()
         return np.mean(self.magnetization), np.var(self.magnetization), np.mean(self.energy), np.var(self.energy)
 
 
 if __name__ == '__main__':
-    kt = np.linspace(0.1, 100, 25)
+    # np.seterr(all='raise')
+    kt = np.linspace(0.1, 100, 10)
     m = []
     E = []
     C_v = []
     chi = []
     for t in kt:
+        print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(50, 50, t)
-        m_bar, m_var, e_bar, e_var = ising.start()
+        m_bar, m_var, e_bar, e_var = ising.start_anim()
         m.append(m_bar)
         E.append(e_bar)
         C_v.append(e_var / t ** 2)
