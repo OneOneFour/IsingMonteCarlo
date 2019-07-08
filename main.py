@@ -101,7 +101,7 @@ class IsingLattice:
 
 if __name__ == '__main__':
     # np.seterr(all='raise')
-    kt = np.linspace(1, 3, 50)
+    kt = np.linspace(1.8, 3, 200)
     m = []
     E = []
     C_v = []
@@ -109,7 +109,7 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(50, 50, t)
-        m_bar, m_var, e_bar, e_var = ising.start(500000)
+        m_bar, m_var, e_bar, e_var = ising.start(5000000)
         m.append(m_bar)
         E.append(e_bar)
         C_v.append(e_var / t ** 2)
