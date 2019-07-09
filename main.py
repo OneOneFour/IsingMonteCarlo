@@ -20,9 +20,9 @@ class IsingLattice:
         self.magnetization = [self.cur_magnetization()]
         self.energy = [self.energy_periodic()]
         self.lattice_state = {
-            'date':strftime('%Y-%m-%d %H-%M-%S', gmtime()),
-            'kt':self.kT,
-            'images':[]
+            'date': strftime('%Y-%m-%d %H-%M-%S', gmtime()),
+            'kt': self.kT,
+            'images': []
         }
 
     def energy_periodic(self):
@@ -117,6 +117,15 @@ class IsingLattice:
                                 repeat=False)
         plt.show()
         return np.mean(self.magnetization), np.var(self.magnetization), np.mean(self.energy), np.var(self.energy)
+
+
+def load_show_image(path):
+    with open(path) as file:
+        lattice_dict = json.load(file)
+        for array in lattice_dict['images']:
+            fig, ax = plt.subplots()
+            ax.imshow(array, cmap='jet')
+            plt.show()
 
 
 if __name__ == '__main__':
