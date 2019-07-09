@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pickle
 from tqdm import tqdm
 from time import gmtime, strftime
+import os
 
 
 class IsingLattice:
@@ -12,6 +13,7 @@ class IsingLattice:
         self.width = width
         self.height = height
         self.kT = kT
+        self.critical = bool(self.kT > 2 / np.log(1 + np.sqrt(2)))
         if cold:
             self.lattice = [[1 for i in range(self.width)] for j in range(self.height)]
         else:
@@ -19,11 +21,7 @@ class IsingLattice:
 
         self.magnetization = [self.cur_magnetization()]
         self.energy = [self.energy_periodic()]
-        self.lattice_state = {
-            'date': strftime('%Y-%m-%d %H-%M-%S', gmtime()),
-            'kt': self.kT,
-            'images': []
-        }
+        self.record_states = []
 
     def energy_periodic(self):
         E = 0
@@ -89,22 +87,15 @@ class IsingLattice:
             im.set_data(self.lattice)
         return im,
 
-    def start(self, max_iter=5000, export_every=0):
+    def start(self, max_iter=5000, export_every=0,delay=0):
         for i in tqdm(range(max_iter)):
-            self.__metropolis_step()
+            self.__metropolis_step(i >= delay)
             if export_every != 0:
                 if i % export_every == 0:
                     # capture snapshot of the image and write to file
-                    self.lattice_state['images'].append(pickle.loads(pickle.dumps(self.lattice)))
-        self.write_file()
-        return (np.mean(self.magnetization)), np.var(self.magnetization), np.mean(self.energy) / (
-                self.width * self.height), np.var(self.energy)
+                    self.record_states.append(pickle.loads(pickle.dumps(self.lattice)))
 
-    def write_file(self):
-        path = f"./{strftime('%Y-%m-%d %H-%M-%S', gmtime())} dump.json"
-        self.lattice_state['num_images'] = len(self.lattice_state['images'])
-        with open(path, 'w') as file:
-            json.dump(self.lattice_state, file)
+        return self.__dict__
 
     def start_anim(self, max_iter=5000):
         import matplotlib.animation as animation
@@ -128,9 +119,40 @@ def load_show_image(path):
             plt.show()
 
 
+class TestTrainSetGenerator:
+    def __init__(self, test_train_ratio=0.8):
+        self.__test_train_ratio = test_train_ratio
+        self.train_images = []
+        self.train_labels = []
+        self.test_images = []
+        self.test_labels = []
+
+    def write(self, fname):
+        with open(fname, 'w') as f:
+            json.dump(self.__dict__, f)
+
+    def load(self, fname):
+        with open(fname) as f:
+            self.__dict__ = json.load(f)
+
+    def get_data(self):
+        return (self.train_images, self.train_labels), (self.test_images, self.test_labels)
+
+    def add(self, images, temp, critical):
+        for image in images:
+            training = bool(random.random() <= self.__test_train_ratio)
+            if training:
+                self.train_images.append(image)
+                self.train_labels.append(critical)
+            else:
+                self.test_images.append(image)
+                self.test_labels.append(critical)
+
+
 if __name__ == '__main__':
     # np.seterr(all='raise')
-    kt = np.linspace(1.8, 3, 200)
+    ttgen = TestTrainSetGenerator()
+    kt = np.linspace(1.8, 2.8, 10)
     m = []
     E = []
     C_v = []
@@ -138,14 +160,27 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(50, 50, t)
-        m_bar, m_var, e_bar, e_var = ising.start(1000000, 10000)
-        m.append(m_bar)
-        E.append(e_bar)
-        C_v.append(e_var / t ** 2)
-
+        result_json = ising.start(10000000, 10000)
+        ttgen.add(result_json['record_states'], t, result_json['critical'])
+        m.append(np.mean(result_json['magnetization']))
+        E.append(np.mean(result_json['energy']))
+        C_v.append(np.var(result_json['energy']) / ((t ** 2) * 2500))
+        chi.append(np.var(result_json['magnetization']) / t)
+    ttgen.write(f"dump_test.json")
+    plt.subplot(2, 2, 1)
+    plt.title("Absolute Magnetization per spin")
+    plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
     plt.plot(kt, m)
-    plt.show()
+    plt.subplot(2, 2, 2)
+    plt.title("Energy per spin")
     plt.plot(kt, E)
-    plt.show()
+    plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
+    plt.subplot(2, 2, 3)
+    plt.title("Heat capacity")
     plt.plot(kt, C_v)
+    plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
+    plt.subplot(2, 2, 4)
+    plt.title("Susceptibility")
+    plt.plot(kt, chi)
+    plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
     plt.show()
