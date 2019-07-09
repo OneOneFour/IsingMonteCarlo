@@ -1,9 +1,11 @@
+import json
 import random
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 from tqdm import tqdm
-from timeit import default_timer as timer
+from time import gmtime, strftime
+
 
 class IsingLattice:
     def __init__(self, width, height, kT, cold=True):
@@ -17,6 +19,11 @@ class IsingLattice:
 
         self.magnetization = [self.cur_magnetization()]
         self.energy = [self.energy_periodic()]
+        self.lattice_state = {
+            'date':strftime('%Y-%m-%d %H-%M-%S', gmtime()),
+            'kt':self.kT,
+            'images':[]
+        }
 
     def energy_periodic(self):
         E = 0
@@ -34,12 +41,12 @@ class IsingLattice:
         E = 0
         for y in range(len(self.lattice)):
             for x in range(len(self.lattice[y])):  # Use nearest neighbouring 4 cells
-                    E += self.lattice[y][x] * (
-                            (self.lattice[y + 1][x] if self.lattice[y + 1][x] < self.height else 0) +
-                            (self.lattice[y - 1][x] if self.lattice[y - 1][x] >= 0 else 0) +
-                            (self.lattice[y][x + 1] if self.lattice[y + 1][x] < self.width else 0) +
-                            (self.lattice[y][x - 1] if self.lattice[y + 1][x] >= 0 else 0)
-                    )
+                E += self.lattice[y][x] * (
+                        (self.lattice[y + 1][x] if self.lattice[y + 1][x] < self.height else 0) +
+                        (self.lattice[y - 1][x] if self.lattice[y - 1][x] >= 0 else 0) +
+                        (self.lattice[y][x + 1] if self.lattice[y + 1][x] < self.width else 0) +
+                        (self.lattice[y][x - 1] if self.lattice[y + 1][x] >= 0 else 0)
+                )
         return E
 
     def showlattice(self):
@@ -61,18 +68,19 @@ class IsingLattice:
             if f >= max_iter - 1:
                 plt.close()
             # print(f"\rFrame:{f} of 5000", end='')
-        rand_y,rand_x = random.randint(0,self.height -1),random.randint(0,self.width -1 )
-        deltaE = 2*self.lattice[rand_y][rand_x]* (
-                    self.lattice[(rand_y + 1) % self.height][rand_x] +
-                    self.lattice[(rand_y - 1) % self.height][rand_x] +
-                    self.lattice[rand_y][(rand_x + 1) % self.width] +
-                    self.lattice[rand_y][(rand_x - 1) % self.width]
+        rand_y, rand_x = random.randint(0, self.height - 1), random.randint(0, self.width - 1)
+        deltaE = 2 * self.lattice[rand_y][rand_x] * (
+                self.lattice[(rand_y + 1) % self.height][rand_x] +
+                self.lattice[(rand_y - 1) % self.height][rand_x] +
+                self.lattice[rand_y][(rand_x + 1) % self.width] +
+                self.lattice[rand_y][(rand_x - 1) % self.width]
         )
         r = random.random()
-        w = np.exp((-1/self.kT) * deltaE)
-        if deltaE <=0 or r <= w:
+        w = np.exp((-1 / self.kT) * deltaE)
+        if deltaE <= 0 or r <= w:
             self.lattice[rand_y][rand_x] *= -1
-            self.magnetization.append(self.magnetization[-1] + 2*self.lattice[rand_y][rand_x]/(self.width*self.height))
+            self.magnetization.append(
+                self.magnetization[-1] + 2 * self.lattice[rand_y][rand_x] / (self.width * self.height))
             self.energy.append(self.energy[-1] + deltaE)
         else:
             self.magnetization.append(self.magnetization[-1])
@@ -81,10 +89,22 @@ class IsingLattice:
             im.set_data(self.lattice)
         return im,
 
-    def start(self, max_iter=5000):
+    def start(self, max_iter=5000, export_every=0):
         for i in tqdm(range(max_iter)):
             self.__metropolis_step()
-        return (np.mean(self.magnetization)), np.var(self.magnetization), np.mean(self.energy)/(self.width*self.height), np.var(self.energy)
+            if export_every != 0:
+                if i % export_every == 0:
+                    # capture snapshot of the image and write to file
+                    self.lattice_state['images'].append(pickle.loads(pickle.dumps(self.lattice)))
+        self.write_file()
+        return (np.mean(self.magnetization)), np.var(self.magnetization), np.mean(self.energy) / (
+                self.width * self.height), np.var(self.energy)
+
+    def write_file(self):
+        path = f"./{strftime('%Y-%m-%d %H-%M-%S', gmtime())} dump.json"
+        self.lattice_state['num_images'] = len(self.lattice_state['images'])
+        with open(path, 'w') as file:
+            json.dump(self.lattice_state, file)
 
     def start_anim(self, max_iter=5000):
         import matplotlib.animation as animation
@@ -109,7 +129,7 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(50, 50, t)
-        m_bar, m_var, e_bar, e_var = ising.start(5000000)
+        m_bar, m_var, e_bar, e_var = ising.start(1000000, 10000)
         m.append(m_bar)
         E.append(e_bar)
         C_v.append(e_var / t ** 2)
