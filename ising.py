@@ -7,6 +7,8 @@ from tqdm import tqdm
 from time import gmtime, strftime
 import os
 
+T_CRIT = 2 / np.log(1 + np.sqrt(2))
+
 
 class IsingLattice:
     def __init__(self, width, height, kT, cold=True):
@@ -88,26 +90,26 @@ class IsingLattice:
         return im,
 
     def start(self, max_iter=5000, export_every=0, delay=0):
-        corrcoeff = []
+        # corrcoeff = []
         for i in tqdm(range(max_iter)):
             self.__metropolis_step()
             if export_every != 0 and i >= delay:
                 if i % export_every == 0:
                     # capture snapshot of the image
-                    if len(corrcoeff) > 0:
-                        plt.plot(corrcoeff, label=f"{i}")
-                        corrcoeff = []
+                    # if len(corrcoeff) > 0:
+                    #     plt.plot(corrcoeff, label=f"{i}")
+                    #     corrcoeff = []
                     self.record_states.append(pickle.loads(pickle.dumps(self.lattice)))
-                if len(self.record_states) > 0:
-                    corrcoeff.append(
-                        np.corrcoef(np.array(self.lattice).flatten(), np.array(self.record_states[-1]).flatten())[0][1])
+            #  if len(self.record_states) > 0:
+            # corrcoeff.append(
+            # np.corrcoef(np.array(self.lattice).flatten(), np.array(self.record_states[-1]).flatten())[0][1])
 
-                # Check the correlation function
+            # Check the correlation function
         self.energy = self.energy[delay:]
         self.magnetization = self.magnetization[delay:]
-        plt.title(f"R^2 correlation at T:{self.kT}")
-        plt.legend()
-        plt.show()
+        # plt.title(f"R^2 correlation at T:{self.kT}")
+        # plt.legend()
+        # plt.show()
 
         return self.__dict__
 
@@ -149,7 +151,7 @@ class TestTrainSetGenerator:
     def get_data(self):
         np.random.shuffle(self.__images)
 
-        split_at = self.__test_train_ratio * len(self.__images)
+        split_at = int(self.__test_train_ratio * len(self.__images))
         train = self.__images[:split_at]
         test = self.__images[split_at:]
         return (np.array([t['image'] for t in train]), np.array([t['label'] for t in train])), (
@@ -163,7 +165,7 @@ class TestTrainSetGenerator:
 if __name__ == '__main__':
     # np.seterr(all='raise')
     ttgen = TestTrainSetGenerator()
-    kt = np.linspace(2.2, 2.5, 20)
+    kt = np.linspace(T_CRIT-0.1, T_CRIT + 0.1, 2)
     m = []
     E = []
     C_v = []
@@ -171,13 +173,13 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(50, 50, t)
-        result_json = ising.start(500000, 100000, 10000)
+        result_json = ising.start(100000000, 100000, 100000)
         ttgen.add(result_json['record_states'], t, result_json['critical'])
         m.append(np.abs(np.mean(result_json['magnetization'])))
         E.append(np.mean(result_json['energy']))
         C_v.append(np.var(result_json['energy']) / ((t ** 2) * 2500))
         chi.append(np.var(result_json['magnetization']) / t)
-    ttgen.write(f"dump_test.json")
+    ttgen.write(f"dump_testT0-1.json")
     plt.subplot(2, 2, 1)
     plt.title("Absolute Magnetization per spin")
     plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
