@@ -91,23 +91,24 @@ class IsingLattice:
         corrcoeff = []
         for i in tqdm(range(max_iter)):
             self.__metropolis_step()
-            if export_every != 0 and i > delay:
+            if export_every != 0 and i >= delay:
                 if i % export_every == 0:
                     # capture snapshot of the image
                     if len(corrcoeff) > 0:
                         plt.plot(corrcoeff, label=f"{i}")
                         corrcoeff = []
                     self.record_states.append(pickle.loads(pickle.dumps(self.lattice)))
-                if len(self.record_states) > 0:
-                    corrcoeff.append(
-                        np.corrcoef(np.array(self.lattice).flatten(), np.array(self.record_states[-1]).flatten())[0][1])
+                # if len(self.record_states) > 0:
+                #     corrcoeff.append(
+                #         np.corrcoef(np.array(self.lattice).flatten(), np.array(self.record_states[-1]).flatten())[0][1])
 
                 # Check the correlation function
         self.energy = self.energy[delay:]
         self.magnetization = self.magnetization[delay:]
-        plt.title(f"R^2 correlation at T:{self.kT}")
-        plt.legend()
-        plt.show()
+        # plt.title(f"R^2 correlation at T:{self.kT}")
+        # plt.legend()
+        # plt.show()
+
         return self.__dict__
 
     def start_animation(self, max_iter=500000):
@@ -173,7 +174,7 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(50, 50, t)
-        result_json = ising.start(500000, 100000, 0)
+        result_json = ising.start(25000000, 100000, 0)
         ttgen.add(result_json['record_states'], t, result_json['critical'])
         m.append(np.abs(np.mean(result_json['magnetization'])))
         E.append(np.mean(result_json['energy']))
