@@ -98,16 +98,16 @@ class IsingLattice:
                         plt.plot(corrcoeff, label=f"{i}")
                         corrcoeff = []
                     self.record_states.append(pickle.loads(pickle.dumps(self.lattice)))
-                # if len(self.record_states) > 0:
-                #     corrcoeff.append(
-                #         np.corrcoef(np.array(self.lattice).flatten(), np.array(self.record_states[-1]).flatten())[0][1])
+                if len(self.record_states) > 0:
+                    corrcoeff.append(
+                        np.corrcoef(np.array(self.lattice).flatten(), np.array(self.record_states[-1]).flatten())[0][1])
 
                 # Check the correlation function
         self.energy = self.energy[delay:]
         self.magnetization = self.magnetization[delay:]
-        # plt.title(f"R^2 correlation at T:{self.kT}")
-        # plt.legend()
-        # plt.show()
+        plt.title(f"R^2 correlation at T:{self.kT}")
+        plt.legend()
+        plt.show()
 
         return self.__dict__
 
@@ -136,10 +136,7 @@ def load_show_image(path):
 class TestTrainSetGenerator:
     def __init__(self, test_train_ratio=0.8):
         self.__test_train_ratio = test_train_ratio
-        self.train_images = []
-        self.train_labels = []
-        self.test_images = []
-        self.test_labels = []
+        self.__images = []
 
     def write(self, fname):
         with open(fname, 'w') as f:
@@ -150,23 +147,23 @@ class TestTrainSetGenerator:
             self.__dict__ = json.load(f)
 
     def get_data(self):
-        return (self.train_images, self.train_labels), (self.test_images, self.test_labels)
+        np.random.shuffle(self.__images)
+
+        split_at = self.__test_train_ratio * len(self.__images)
+        train = self.__images[:split_at]
+        test = self.__images[split_at:]
+        return (np.array([t['image'] for t in train]), np.array([t['label'] for t in train])), (
+            np.array([t['image'] for t in test]), np.array([t['label'] for t in test]))
 
     def add(self, images, temp, critical):
         for image in images:
-            training = bool(random.random() <= self.__test_train_ratio)
-            if training:
-                self.train_images.append(image)
-                self.train_labels.append(critical)
-            else:
-                self.test_images.append(image)
-                self.test_labels.append(critical)
+            self.__images.append({'image': image, 'label': int(critical)})
 
 
 if __name__ == '__main__':
     # np.seterr(all='raise')
     ttgen = TestTrainSetGenerator()
-    kt = np.linspace(1.8, 2.8,10)
+    kt = np.linspace(2.2, 2.5, 20)
     m = []
     E = []
     C_v = []
@@ -174,7 +171,7 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(50, 50, t)
-        result_json = ising.start(25000000, 100000, 0)
+        result_json = ising.start(500000, 100000, 10000)
         ttgen.add(result_json['record_states'], t, result_json['critical'])
         m.append(np.abs(np.mean(result_json['magnetization'])))
         E.append(np.mean(result_json['energy']))
