@@ -7,6 +7,7 @@ from tqdm import tqdm
 from time import gmtime, strftime
 import os
 
+
 T_CRIT = 2 / np.log(1 + np.sqrt(2))
 
 
@@ -63,30 +64,31 @@ class IsingLattice:
 
         # Flip the configuration spin
 
-    def __metropolis_step(self, f=0, im=None, max_iter=5000):
-        if im:
-            if f >= max_iter - 1:
-                plt.close()
-            # print(f"\rFrame:{f} of 5000", end='')
-        rand_y, rand_x = random.randint(0, self.height - 1), random.randint(0, self.width - 1)
-        deltaE = 2 * self.lattice[rand_y][rand_x] * (
-                self.lattice[(rand_y + 1) % self.height][rand_x] +
-                self.lattice[(rand_y - 1) % self.height][rand_x] +
-                self.lattice[rand_y][(rand_x + 1) % self.width] +
-                self.lattice[rand_y][(rand_x - 1) % self.width]
-        )
-        r = random.random()
-        w = np.exp((-1 / self.kT) * deltaE)
-        if deltaE <= 0 or r <= w:
-            self.lattice[rand_y][rand_x] *= -1
-            self.magnetization.append(
-                self.magnetization[-1] + 2 * self.lattice[rand_y][rand_x] / (self.width * self.height))
-            self.energy.append(self.energy[-1] + deltaE)
-        else:
-            self.magnetization.append(self.magnetization[-1])
-            self.energy.append(self.energy[-1])
-        if im:
-            im.set_data(self.lattice)
+    def __metropolis_step(self, f=0, im=None, max_iter=5000,batch=1):
+        for i in range(batch):
+            if im:
+                if f >= max_iter - 1:
+                    plt.close()
+                # print(f"\rFrame:{f} of 5000", end='')
+            rand_y, rand_x = random.randint(0, self.height - 1), random.randint(0, self.width - 1)
+            deltaE = 2 * self.lattice[rand_y][rand_x] * (
+                    self.lattice[(rand_y + 1) % self.height][rand_x] +
+                    self.lattice[(rand_y - 1) % self.height][rand_x] +
+                    self.lattice[rand_y][(rand_x + 1) % self.width] +
+                    self.lattice[rand_y][(rand_x - 1) % self.width]
+            )
+            r = random.random()
+            w = np.exp((-1 / self.kT) * deltaE)
+            if deltaE <= 0 or r <= w:
+                self.lattice[rand_y][rand_x] *= -1
+                self.magnetization.append(
+                    self.magnetization[-1] + 2 * self.lattice[rand_y][rand_x] / (self.width * self.height))
+                self.energy.append(self.energy[-1] + deltaE)
+            else:
+                self.magnetization.append(self.magnetization[-1])
+                self.energy.append(self.energy[-1])
+            if im:
+                im.set_data(self.lattice)
         return im,
 
     def start(self, max_iter=5000, export_every=0, delay=0):
@@ -113,17 +115,17 @@ class IsingLattice:
 
         return self.__dict__
 
-    def start_animation(self, max_iter=500000):
+    def start_animation(self, max_iter=500000,batch=1):
         import matplotlib.animation as animation
         fig, ax = plt.subplots()
 
         im = plt.imshow(self.lattice, cmap='jet', animated=True, vmin=-1, vmax=1)
 
-        animation.FuncAnimation(fig, self.__metropolis_step, fargs=(im, max_iter,), blit=True, frames=max_iter,
+        animation.FuncAnimation(fig, self.__metropolis_step, fargs=(im, max_iter,batch,), blit=True, frames=max_iter,
                                 interval=0,
                                 repeat=False)
         plt.show()
-        return np.mean(self.magnetization), np.var(self.magnetization), np.mean(self.energy), np.var(self.energy)
+        return self.__dict__
 
 
 def load_show_image(path):
@@ -165,7 +167,7 @@ class TestTrainSetGenerator:
 if __name__ == '__main__':
     # np.seterr(all='raise')
     ttgen = TestTrainSetGenerator()
-    kt = np.linspace(T_CRIT-0.1, T_CRIT + 0.1, 2)
+    kt = np.linspace(T_CRIT+5 , T_CRIT + 6, 50)
     m = []
     E = []
     C_v = []
@@ -173,13 +175,13 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(50, 50, t)
-        result_json = ising.start(100000000, 100000, 100000)
+        result_json = ising.start_animation(1000000,300)
         ttgen.add(result_json['record_states'], t, result_json['critical'])
         m.append(np.abs(np.mean(result_json['magnetization'])))
         E.append(np.mean(result_json['energy']))
         C_v.append(np.var(result_json['energy']) / ((t ** 2) * 2500))
         chi.append(np.var(result_json['magnetization']) / t)
-    ttgen.write(f"dump_testT0-1.json")
+    ttgen.write(f"dump_testT00-1.json")
     plt.subplot(2, 2, 1)
     plt.title("Absolute Magnetization per spin")
     plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')

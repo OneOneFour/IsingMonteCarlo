@@ -19,14 +19,14 @@ def plot_image_with_nn(image, label, prediction):
     plt.imshow(image)
     plt.title(f"Label Supercritical?:{bool(label)}")
     plt.subplot(1, 2, 2)
-    plt.title(f"Prediction:{ 'Supercritical' if np.argmax(prediction) else 'Subcritical'} ({round(prediction[np.argmax(prediction)]* 100) }%)")
+    plt.title(f"Prediction:{'Supercritical' if np.argmax(prediction) else 'Subcritical'} ({round(prediction[np.argmax(prediction)] * 100)}%)")
     plt.bar(range(2), prediction)
     plt.show()
 
 
 if __name__ == '__main__':
     ttfing = TestTrainSetGenerator()
-    ttfing.load(f"dump_test.json")
+    ttfing.load(f"dump_testT0-1.json")
 
     (train_images, train_labels), (test_images, test_labels) = ttfing.get_data()
 
@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
     model = tf.keras.Sequential([
         tf.keras.layers.Flatten(input_shape=(50, 50)),
-        tf.keras.layers.Dense(10, activation=tf.nn.sigmoid),
+        tf.keras.layers.Dense(1000, activation=tf.nn.sigmoid),
         tf.keras.layers.Dense(2, activation=tf.nn.softmax)
     ])
 
@@ -53,5 +53,16 @@ if __name__ == '__main__':
     print(f"Test accuracy:{test_acc}")
 
     predict = model.predict(test_images)
-    for i, img in enumerate(test_images):
+    for i, img in enumerate(test_images[:10]):
         plot_image_with_nn(img, test_labels[i], predict[i])
+
+    harder_test = TestTrainSetGenerator()
+    harder_test.load(f"dump_testT00-1.json")
+    (train_images_h, train_labels_h), (test_images_h, test_labels_h) = harder_test.get_data()
+    train_images_h = (train_images_h + 1) / 2
+    test_images_h = (test_images_h + 1) / 2
+    hard_lost,hard_acc = model.evaluate(test_images_h,test_labels_h)
+    print(f"Harder test accuracy:{hard_acc}")
+    predict_h = model.predict(test_images_h)
+    for i,img in enumerate(test_images_h[:10]):
+        plot_image_with_nn(img,test_labels_h[i],predict_h[i])
