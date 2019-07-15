@@ -62,14 +62,41 @@ class IsingLattice:
 
         # Flip the configuration spin
 
-    def __swedsen_wang_step(self):
+    def __wolff_step(self):
         '''
         Work using bonds as opposed to individual spins on the lattice.
         Converts problem to a percolation problem which unlike Metropolis does not fall in to inf relaxation time at the critical
         temperature.
         :return: Artist object to be blitted to matplotlib canvas
         '''
-        rand_y, rand_x = np.random.randint(0, self.size - 1, size=2)
+        rand_y, rand_x = np.random.randint(0, self.size, size=2)
+        cluster = [(rand_y, rand_x)]
+        deltaE = 0
+
+        def check_and_add(y, x, y_1, x_1, deltaE):
+            if (y_1, x_1) in cluster:
+                return
+            y_1, x_1 = (y_1 % self.size, x_1 % self.size)
+            if self.lattice[y][x] == self.lattice[y_1][x_1]:
+                if random.random() < (1 - np.exp(-1 / self.kT)):
+                    cluster.append((y_1, x_1))
+                    deltaE += 2 * self.lattice[y_1][x_1] * (
+                            self.lattice[(y_1 + 1) % self.size][x_1] +
+                            self.lattice[(y_1 - 1) % self.size][x_1] +
+                            self.lattice[y_1][(x_1 + 1) % self.size] +
+                            self.lattice[y_1][(x_1 - 1) % self.size])
+
+        for p in cluster:
+            check_and_add(p[0], p[1], p[0] + 1, p[1], deltaE)
+            check_and_add(p[0], p[1], p[0] - 1, p[1], deltaE)
+            check_and_add(p[0], p[1], p[0], p[1] + 1, deltaE)
+            check_and_add(p[0], p[1], p[0], p[1] - 1, deltaE)
+
+        for p in cluster:
+            self.lattice[p[0]][p[1]] *= 1
+
+        self.energy.append(self.energy[-1] + deltaE)
+        self.magnetization.append(self.cur_magnetization())
 
     def __metropolis_step(self, f=0, im=None, max_iter=5000, batch=1):
         for i in range(batch):
@@ -100,9 +127,10 @@ class IsingLattice:
 
     def start(self, max_iter=5000, export_every=0, delay=0):
         # corrcoeff = []
-        self.record_states = [0] * (int(max_iter / export_every) - 1)
+        if export_every != 0:
+            self.record_states = [0] * (int(max_iter / export_every) - 1)
         for i in tqdm(range(max_iter)):
-            self.__metropolis_step()
+            self.__wolff_step()
             if export_every != 0 and i >= delay:
                 if i % export_every == 0:
                     # capture snapshot of the image
@@ -183,15 +211,15 @@ class TestTrainSetGenerator:
 if __name__ == '__main__':
     # np.seterr(all='raise')
     ttgen = TestTrainSetGenerator()
-    kt = np.linspace(T_CRIT - 0.25, T_CRIT + 0.25, 100)
+    kt = np.linspace(T_CRIT - 0.25, T_CRIT + 0.25, 10)
     m = []
     E = []
     C_v = []
     chi = []
     for t in kt:
         print(f"\nIterating at temperature: {t}")
-        ising = IsingLattice(50, 50, t)
-        result_json = ising.start(30000000, 150000, 200000)
+        ising = IsingLattice(50, t, t < T_CRIT)
+        result_json = ising.start(100000, 0, 0)
         ttgen.add(result_json['record_states'], t, result_json['critical'])
         m.append(np.abs(np.mean(result_json['magnetization'])))
         E.append(np.mean(result_json['energy']))
