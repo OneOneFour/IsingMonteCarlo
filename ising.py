@@ -7,7 +7,7 @@ from tqdm import tqdm
 from time import gmtime, strftime
 import os
 
-T_CRIT = 2 / np.log(1 + np.sqrt(2))
+T_CRIT_ONS = 2 / np.log(1 + np.sqrt(2))
 
 
 class IsingLattice:
@@ -68,7 +68,7 @@ class IsingLattice:
         return np.abs(magnetization / (self.size ** 2))
         # Flip the configuration spin
 
-    def __wolff_step(self, f=0, im=None):
+    def __wolff_step(self, f=0, im=None,record=False):
         '''
         Work using bonds as opposed to individual spins on the lattice.
         Converts problem to a percolation problem which unlike Metropolis does not fall in to inf relaxation time at the critical
@@ -100,16 +100,16 @@ class IsingLattice:
 
         for p in cluster:
             self.lattice[p[0]][p[1]] *= -1
-
-        self.energy.append(self.energy[-1] + deltaE)  # weight these samples by the MC time occupied by each one
-        self.magnetization.append(self.abs_cur_magnetization())
+        if record:
+            self.energy.append(self.energy[-1] + deltaE)  # weight these samples by the MC time occupied by each one
+            self.magnetization.append(self.abs_cur_magnetization())
         if im:
             im.set_data(self.lattice)
             return im,
         else:
             return len(cluster)
 
-    def __metropolis_step(self, f=0, im=None, max_iter=5000, batch=1):
+    def __metropolis_step(self, f=0, im=None, max_iter=5000, batch=1,record=False):
         for i in range(batch):
             if im:
                 if f >= max_iter - 1:
@@ -126,12 +126,14 @@ class IsingLattice:
             w = np.exp((-1 / self.kT) * deltaE)
             if deltaE <= 0 or r <= w:
                 self.lattice[rand_y][rand_x] *= -1
-                self.magnetization.append(
-                    self.magnetization[-1] + 2 * self.lattice[rand_y][rand_x] / (self.size ** 2))
-                self.energy.append(self.energy[-1] + deltaE)
+                if record:
+                    self.magnetization.append(
+                        self.magnetization[-1] + 2 * self.lattice[rand_y][rand_x] / (self.size ** 2))
+                    self.energy.append(self.energy[-1] + deltaE)
             else:
-                self.magnetization.append(self.magnetization[-1])
-                self.energy.append(self.energy[-1])
+                if record:
+                    self.magnetization.append(self.magnetization[-1])
+                    self.energy.append(self.energy[-1])
         if im:
             im.set_data(self.lattice)
             return im,
@@ -147,9 +149,9 @@ class IsingLattice:
         with tqdm(total=max_iter) as pbar:
             while i < max_iter:
                 if method == 'metropolis':
-                    steps = self.__metropolis_step()
+                    steps = self.__metropolis_step(record=i>=delay)
                 elif method == 'wolff':
-                    steps = self.__wolff_step()
+                    steps = self.__wolff_step(record=i>delay)
                 else:
                     raise ValueError(f"{method} is not a supported iteration method. Please choose from 'wolff' or 'metropolis' ")
 
@@ -168,9 +170,6 @@ class IsingLattice:
                 # Update progress bar and loop progress
                 i += steps
                 pbar.update(steps)
-
-        self.energy = self.energy[delay:]
-        self.magnetization = self.magnetization[delay:]
         if log_correlation:
             plt.title(f"R^2 correlation at T:{self.kT}")
             plt.legend()
