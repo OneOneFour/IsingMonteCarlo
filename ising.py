@@ -144,30 +144,30 @@ class IsingLattice:
         if export_every != 0:
             self.record_states = [0] * (int(max_iter / export_every) - 1)
         i = 0
-        pbar = tqdm(total=max_iter)
-        while i < max_iter:
-            if method == 'metropolis':
-                steps = self.__metropolis_step()
-            elif method == 'wolff':
-                steps = self.__wolff_step()
-            else:
-                raise ValueError(f"{method} is not a supported iteration method. Please choose from 'wolff' or 'metropolis' ")
+        with tqdm(total=max_iter) as pbar:
+            while i < max_iter:
+                if method == 'metropolis':
+                    steps = self.__metropolis_step()
+                elif method == 'wolff':
+                    steps = self.__wolff_step()
+                else:
+                    raise ValueError(f"{method} is not a supported iteration method. Please choose from 'wolff' or 'metropolis' ")
 
-            if export_every != 0 and i >= delay:
-                if int(i / export_every) >= len(self.record_states):
-                    # capture snapshot of the image
-                    if log_correlation
-                        if len(corrcoeff) > 0:
-                            plt.plot(corrcoeff, label=f"{i}")
-                            corrcoeff = []
-                    self.record_states[int(i / export_every)] = pickle.loads(pickle.dumps(self.lattice))
-            if log_correlation:
-                 if len(self.record_states) > 0:
-                    corrcoeff.append(np.corrcoef(np.array(self.lattice).flatten(), np.array(self.record_states[-1]).flatten())[0][1])
+                if export_every != 0 and i >= delay:
+                    if int(i / export_every) >= len(self.record_states):
+                        # capture snapshot of the image
+                        if log_correlation:
+                            if len(corrcoeff) > 0:
+                                plt.plot(corrcoeff, label=f"{i}")
+                                corrcoeff = []
+                        self.record_states[int(i / export_every)] = pickle.loads(pickle.dumps(self.lattice))
+                if log_correlation:
+                     if len(self.record_states) > 0:
+                        corrcoeff.append(np.corrcoef(np.array(self.lattice).flatten(), np.array(self.record_states[-1]).flatten())[0][1])
 
-            # Update progress bar and loop progress
-            i += steps
-            pbar.update(steps)
+                # Update progress bar and loop progress
+                i += steps
+                pbar.update(steps)
 
         self.energy = self.energy[delay:]
         self.magnetization = self.magnetization[delay:]
@@ -245,7 +245,7 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(50, t, t < T_CRIT)
-        result_json = ising.start(500000, 0, 200000)
+        result_json = ising.start('wolff',500000, 0, 200000)
         ttgen.add(result_json['record_states'], t, result_json['critical'])
         m.append(np.abs(np.mean(result_json['magnetization'])))
         E.append(np.mean(result_json['energy']))
