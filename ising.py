@@ -60,9 +60,15 @@ class IsingLattice:
                 magnetization += spin
         return magnetization / (self.size ** 2)
 
+    def abs_cur_magnetization(self):
+        magnetization = 0
+        for row in self.lattice:
+            for spin in row:
+                magnetization += spin
+        return np.abs(magnetization / (self.size ** 2))
         # Flip the configuration spin
 
-    def __wolff_step(self):
+    def __wolff_step(self, f=0, im=None):
         '''
         Work using bonds as opposed to individual spins on the lattice.
         Converts problem to a percolation problem which unlike Metropolis does not fall in to inf relaxation time at the critical
@@ -74,13 +80,13 @@ class IsingLattice:
         deltaE = 0
 
         def check_and_add(y, x, y_1, x_1, deltaE):
+            y_1, x_1 = (y_1 % self.size, x_1 % self.size)
             if (y_1, x_1) in cluster:
                 return
-            y_1, x_1 = (y_1 % self.size, x_1 % self.size)
             if self.lattice[y][x] == self.lattice[y_1][x_1]:
-                if random.random() < (1 - np.exp(-1 / self.kT)):
+                if random.random() <= (1 - np.exp(-1 / self.kT)):
                     cluster.append((y_1, x_1))
-                    deltaE += 2 * self.lattice[y_1][x_1] * (
+                    deltaE += 2 * self.lattice[y_1][x_1] * (  # This calculation is CORRECT, don't let anyone tell you otherwise!
                             self.lattice[(y_1 + 1) % self.size][x_1] +
                             self.lattice[(y_1 - 1) % self.size][x_1] +
                             self.lattice[y_1][(x_1 + 1) % self.size] +
@@ -93,10 +99,15 @@ class IsingLattice:
             check_and_add(p[0], p[1], p[0], p[1] - 1, deltaE)
 
         for p in cluster:
-            self.lattice[p[0]][p[1]] *= 1
+            self.lattice[p[0]][p[1]] *= -1
 
-        self.energy.append(self.energy[-1] + deltaE)
-        self.magnetization.append(self.cur_magnetization())
+        self.energy.append(self.energy[-1] + deltaE)  # weight these samples by the MC time occupied by each one
+        self.magnetization.append(self.abs_cur_magnetization())
+        if im:
+            im.set_data(self.lattice)
+            return im,
+        else:
+            return len(cluster)
 
     def __metropolis_step(self, f=0, im=None, max_iter=5000, batch=1):
         for i in range(batch):
@@ -121,18 +132,24 @@ class IsingLattice:
             else:
                 self.magnetization.append(self.magnetization[-1])
                 self.energy.append(self.energy[-1])
-            if im:
-                im.set_data(self.lattice)
-        return im,
+        if im:
+            im.set_data(self.lattice)
+            return im,
+        else:
+            return batch
 
     def start(self, max_iter=5000, export_every=0, delay=0):
         # corrcoeff = []
         if export_every != 0:
             self.record_states = [0] * (int(max_iter / export_every) - 1)
-        for i in tqdm(range(max_iter)):
-            self.__wolff_step()
+        i = 0
+        pbar = tqdm(total=max_iter)
+        while i < max_iter:
+            steps = self.__wolff_step()
+
+            # TODO: This will now no longer work!
             if export_every != 0 and i >= delay:
-                if i % export_every == 0:
+                if int(i / export_every) >= len(self.record_states):
                     # capture snapshot of the image
                     # if len(corrcoeff) > 0:
                     #     plt.plot(corrcoeff, label=f"{i}")
@@ -143,7 +160,10 @@ class IsingLattice:
             # corrcoeff.append(
             # np.corrcoef(np.array(self.lattice).flatten(), np.array(self.record_states[-1]).flatten())[0][1])
 
-            # Check the correlation function
+            # Update progress bar and loop progress
+            i += steps
+            pbar.update(steps)
+
         self.energy = self.energy[delay:]
         self.magnetization = self.magnetization[delay:]
         # plt.title(f"R^2 correlation at T:{self.kT}")
@@ -158,7 +178,7 @@ class IsingLattice:
 
         im = plt.imshow(self.lattice, cmap='jet', animated=True, vmin=-1, vmax=1)
 
-        animation.FuncAnimation(fig, self.__metropolis_step, fargs=(im, max_iter, batch,), blit=True, frames=max_iter,
+        animation.FuncAnimation(fig, self.__wolff_step, fargs=(im,), blit=True, frames=max_iter,
                                 interval=0,
                                 repeat=False)
         plt.show()
@@ -211,7 +231,7 @@ class TestTrainSetGenerator:
 if __name__ == '__main__':
     # np.seterr(all='raise')
     ttgen = TestTrainSetGenerator()
-    kt = np.linspace(T_CRIT - 0.25, T_CRIT + 0.25, 10)
+    kt = np.linspace(0.5, 5, 10)
     m = []
     E = []
     C_v = []
@@ -219,7 +239,7 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(50, t, t < T_CRIT)
-        result_json = ising.start(100000, 0, 0)
+        result_json = ising.start(500000, 0, 200000)
         ttgen.add(result_json['record_states'], t, result_json['critical'])
         m.append(np.abs(np.mean(result_json['magnetization'])))
         E.append(np.mean(result_json['energy']))
