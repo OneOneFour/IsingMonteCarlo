@@ -138,27 +138,32 @@ class IsingLattice:
         else:
             return batch
 
-    def start(self, max_iter=5000, export_every=0, delay=0):
-        # corrcoeff = []
+    def start(self, method='metropolis', max_iter=5000, export_every=0, delay=0, log_correlation=False):
+        if log_correlation:
+            corrcoeff = []
         if export_every != 0:
             self.record_states = [0] * (int(max_iter / export_every) - 1)
         i = 0
         pbar = tqdm(total=max_iter)
         while i < max_iter:
-            steps = self.__wolff_step()
+            if method == 'metropolis':
+                steps = self.__metropolis_step()
+            elif method == 'wolff':
+                steps = self.__wolff_step()
+            else:
+                raise ValueError(f"{method} is not a supported iteration method. Please choose from 'wolff' or 'metropolis' ")
 
-            # TODO: This will now no longer work!
             if export_every != 0 and i >= delay:
                 if int(i / export_every) >= len(self.record_states):
                     # capture snapshot of the image
-                    # if len(corrcoeff) > 0:
-                    #     plt.plot(corrcoeff, label=f"{i}")
-                    #     corrcoeff = []
+                    if log_correlation
+                        if len(corrcoeff) > 0:
+                            plt.plot(corrcoeff, label=f"{i}")
+                            corrcoeff = []
                     self.record_states[int(i / export_every)] = pickle.loads(pickle.dumps(self.lattice))
-
-            #  if len(self.record_states) > 0:
-            # corrcoeff.append(
-            # np.corrcoef(np.array(self.lattice).flatten(), np.array(self.record_states[-1]).flatten())[0][1])
+            if log_correlation:
+                 if len(self.record_states) > 0:
+                    corrcoeff.append(np.corrcoef(np.array(self.lattice).flatten(), np.array(self.record_states[-1]).flatten())[0][1])
 
             # Update progress bar and loop progress
             i += steps
@@ -166,9 +171,10 @@ class IsingLattice:
 
         self.energy = self.energy[delay:]
         self.magnetization = self.magnetization[delay:]
-        # plt.title(f"R^2 correlation at T:{self.kT}")
-        # plt.legend()
-        # plt.show()
+        if log_correlation:
+            plt.title(f"R^2 correlation at T:{self.kT}")
+            plt.legend()
+            plt.show()
 
         return self.__dict__
 
