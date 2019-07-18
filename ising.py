@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 from tqdm import tqdm
-from time import gmtime, strftime
+from datetime import datetime as dt
 import os
 
 T_CRIT_ONS = 2 / np.log(1 + np.sqrt(2))
@@ -68,7 +68,21 @@ class IsingLattice:
         return np.abs(magnetization / (self.size ** 2))
         # Flip the configuration spin
 
-    def __wolff_step(self, f=0, im=None,record=False):
+    def add_e_and_m(self):
+        E, m = 0, 0
+        for y in range(len(self.lattice)):
+            for x in range(len(self.lattice[y])):
+                E += -1 * self.lattice[y][x] * (
+                        self.lattice[(y + 1) % self.size][x] +
+                        self.lattice[(y - 1) % self.size][x] +
+                        self.lattice[y][(x + 1) % self.size] +
+                        self.lattice[y][(x - 1) % self.size]
+                )
+                m += self.lattice[y][x]
+        self.energy.append(E)
+        self.magnetization.append(np.abs(m / (self.size ** 2)))
+
+    def __wolff_step(self, f=0, im=None, record=False):
         '''
         Work using bonds as opposed to individual spins on the lattice.
         Converts problem to a percolation problem which unlike Metropolis does not fall in to inf relaxation time at the critical
@@ -84,13 +98,8 @@ class IsingLattice:
             if (y_1, x_1) in cluster:
                 return
             if self.lattice[y][x] == self.lattice[y_1][x_1]:
-                if random.random() <= (1 - np.exp(-1 / self.kT)):
+                if random.random() <= (1 - np.exp(-2 / self.kT)):
                     cluster.append((y_1, x_1))
-                    deltaE += 2 * self.lattice[y_1][x_1] * (  # This calculation is CORRECT, don't let anyone tell you otherwise!
-                            self.lattice[(y_1 + 1) % self.size][x_1] +
-                            self.lattice[(y_1 - 1) % self.size][x_1] +
-                            self.lattice[y_1][(x_1 + 1) % self.size] +
-                            self.lattice[y_1][(x_1 - 1) % self.size])
 
         for p in cluster:
             check_and_add(p[0], p[1], p[0] + 1, p[1], deltaE)
@@ -101,15 +110,14 @@ class IsingLattice:
         for p in cluster:
             self.lattice[p[0]][p[1]] *= -1
         if record:
-            self.energy.append(self.energy[-1] + deltaE)  # weight these samples by the MC time occupied by each one
-            self.magnetization.append(self.abs_cur_magnetization())
+            self.add_e_and_m()
         if im:
             im.set_data(self.lattice)
             return im,
         else:
             return len(cluster)
 
-    def __metropolis_step(self, f=0, im=None, max_iter=5000, batch=1,record=False):
+    def __metropolis_step(self, f=0, im=None, max_iter=5000, batch=1, record=False):
         for i in range(batch):
             if im:
                 if f >= max_iter - 1:
@@ -144,28 +152,32 @@ class IsingLattice:
         if log_correlation:
             corrcoeff = []
         if export_every != 0:
-            self.record_states = [0] * (int(max_iter / export_every) - 1)
+            self.record_states = []
         i = 0
         with tqdm(total=max_iter) as pbar:
             while i < max_iter:
                 if method == 'metropolis':
-                    steps = self.__metropolis_step(record=i>=delay)
+                    steps = self.__metropolis_step(record=i >= delay)
                 elif method == 'wolff':
-                    steps = self.__wolff_step(record=i>delay)
+                    steps = self.__wolff_step(record=i > delay)
                 else:
                     raise ValueError(f"{method} is not a supported iteration method. Please choose from 'wolff' or 'metropolis' ")
 
                 if export_every != 0 and i >= delay:
+
                     if int(i / export_every) >= len(self.record_states):
                         # capture snapshot of the image
                         if log_correlation:
                             if len(corrcoeff) > 0:
                                 plt.plot(corrcoeff, label=f"{i}")
                                 corrcoeff = []
-                        self.record_states[int(i / export_every)] = pickle.loads(pickle.dumps(self.lattice))
+                        self.record_states.append(pickle.loads(pickle.dumps(self.lattice)))
                 if log_correlation:
-                     if len(self.record_states) > 0:
-                        corrcoeff.append(np.corrcoef(np.array(self.lattice).flatten(), np.array(self.record_states[-1]).flatten())[0][1])
+                    if len(self.record_states) > 0:
+                        a = np.array(self.lattice).flatten()
+                        b = np.array(self.record_states[-1]).flatten()
+                        c = np.corrcoef(a, b)
+                        corrcoeff.append(c[0][1])
 
                 # Update progress bar and loop progress
                 i += steps
@@ -236,21 +248,24 @@ class TestTrainSetGenerator:
 if __name__ == '__main__':
     # np.seterr(all='raise')
     ttgen = TestTrainSetGenerator()
-    kt = np.linspace(0.5, 5, 10)
+    size = 100
+    min_res = 10 / (4 * 100)
+    kt = np.linspace(T_CRIT_ONS - min_res, T_CRIT_ONS + min_res, 2)
+
     m = []
     E = []
     C_v = []
     chi = []
     for t in kt:
         print(f"\nIterating at temperature: {t}")
-        ising = IsingLattice(50, t, t < T_CRIT)
-        result_json = ising.start('wolff',500000, 0, 200000)
+        ising = IsingLattice(size, t, t < T_CRIT_ONS)
+        result_json = ising.start('wolff', 5000000, 25000, 250000)
         ttgen.add(result_json['record_states'], t, result_json['critical'])
         m.append(np.abs(np.mean(result_json['magnetization'])))
         E.append(np.mean(result_json['energy']))
         C_v.append(np.var(result_json['energy']) / ((t ** 2) * 2500))
         chi.append(np.var(result_json['magnetization']) / t)
-    ttgen.write(f"dump_testT00-1.json")
+    ttgen.write(f"{dt.now().strftime('%d-%m-%Y %H-%M-%S')}dump.json")
     plt.subplot(2, 2, 1)
     plt.title("Absolute Magnetization per spin")
     plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
