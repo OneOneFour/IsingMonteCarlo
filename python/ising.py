@@ -242,6 +242,19 @@ class TestTrainSetGenerator:
         return (np.array(train_data, dtype=np.float32), np.array(train_label, dtype=np.int32)), (
             np.array(test_data, dtype=np.float32), np.array(test_label, dtype=np.int32))
 
+    def get_data_flattened(self):
+        np.random.shuffle(self.__images)
+
+        split_at = int(self.__test_train_ratio * len(self.__images))
+
+        train_data = [np.array(t['image']).flatten() for t in self.__images[:split_at]]
+        test_data = [np.array(t['image']).flatten() for t in self.__images[split_at:]]
+
+        train_label = [t['label'] for t in self.__images[:split_at]]
+        test_label = [t['label'] for t in self.__images[split_at:]]
+        return (np.array(train_data, dtype=np.float32), np.array(train_label, dtype=np.int32)), (
+            np.array(test_data, dtype=np.float32), np.array(test_label, dtype=np.int32))
+
     def add(self, images, temp, critical):
         for image in images:
             self.__images.append({'image': image, 'label': int(critical)})
@@ -260,15 +273,15 @@ if __name__ == '__main__':
     chi = []
     for t in kt:
         print(f"\nIterating at temperature: {t}")
-        ising = IsingLattice(size,t, t< T_CRIT_ONS)
-        result_json = ising.start('metropolis', 25000000, 100000, 500000)
-        #result_json = ising.start_animation('metropolis', 1000000, 2500)
+        ising = IsingLattice(size, t, t < T_CRIT_ONS)
+        result_json = ising.start('metropolis', 25000000, 0, 0)
+        # result_json = ising.start_animation('metropolis', 1000000, 2500)
         ttgen.add(result_json['record_states'], t, result_json['critical'])
         m.append(np.abs(np.mean(result_json['magnetization'])))
         E.append(np.mean(result_json['energy']))
         C_v.append(np.var(result_json['energy']) / ((t ** 2) * 2500))
         chi.append(np.var(result_json['magnetization']) / t)
-    ttgen.write(f"{dt.now().strftime('%d-%m-%Y %H-%M-%S')}dump.json")
+    ttgen.write(f"../dumps/{dt.now().strftime('%d-%m-%Y %H-%M-%S')}dump.json")
     plt.subplot(2, 2, 1)
     plt.title("Absolute Magnetization per spin")
     plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')

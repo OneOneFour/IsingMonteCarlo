@@ -84,7 +84,7 @@ double IsingModel::get_mean_energy()
 	for (int i = 0; i < this->arrLen; i++) {
 		e_bar += this->energy[i];
 	}
-	return (double)e_bar / this->arrLen;
+	return (double)e_bar / ((double)(this->size*this->size) * this->arrLen);
 }
 
 double IsingModel::get_abs_mean_magnitization()
@@ -93,7 +93,9 @@ double IsingModel::get_abs_mean_magnitization()
 	for (int i = 0; i < this->arrLen; i++) {
 		m_bar += this->magnetization[i];
 	}
-	return abs(m_bar) / (this->size*this->size*this->arrLen);
+	double denom = (double)(this->size * this->size) * this->arrLen;
+	return abs(m_bar) / denom;
+
 }
 
 int IsingModel::metropolis_step(int i) {
