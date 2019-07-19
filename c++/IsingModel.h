@@ -13,15 +13,14 @@ public:
 	double* get_magnetization();
 
 	double get_mean_energy();
-	double get_var_energy();
 	double get_abs_mean_magnitization();
-	double get_var_magntization();
 private:
 	int metropolis_step(int i);
 	//int wolff_step();
 	int get_site(int x, int y);
 	void flip_site(int x, int y);
 	int size;
+	int arrLen; 
 	bool* lattice;
 	double t;
 	double* energy;
