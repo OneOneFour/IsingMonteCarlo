@@ -48,11 +48,12 @@ data_dict = {
 #         return classification
 
 if __name__ == '__main__':
-    ttf = TestTrainSetGenerator()
-    ttf.load("../dumps/dump_testT0-1.json")
-    train_data, train_labels, test_data, test_labels = ttf.get_data_flattened()
+    ttf = TestTrainSetGenerator(size=50)
+    ttf.load("../dumps/dump_testT00-1(old).json")
+    (train_data, train_labels),(test_data, test_labels) = ttf.get_data_flattened()
     svm = SVC(kernel="linear")
 
-    svm.fit(train_data,train_labels)
+    svm.fit(train_data, train_labels)
 
-    svm.plot(data_dict)
+    predict_labels = svm.predict(test_data)
+    print(f"Accuracy:{metrics.accuracy_score(test_labels, predict_labels)}")

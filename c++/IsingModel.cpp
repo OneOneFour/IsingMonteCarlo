@@ -1,12 +1,12 @@
 #include "IsingModel.h"
 
 
-IsingModel::IsingModel(int size, double t) :rng{ rd() }, uni(0, size), r(0, 1),arrLen(0),energy(nullptr),magnetization(nullptr) {
+IsingModel::IsingModel(int size, double t) :rng{ rd() }, uni(0, size), r(0, 1),e(0),m(0),last_e(0),last_m(0),esq(0),msq(0) {
 	this->size = size;
 	this->t = t;
 	this->lattice = new bool[this->size * this->size];
 
-	for (int i = 0; i < this->size*this->size; i++) {
+	for (int i = 0; i < this->size * this->size; i++) {
 		this->lattice[i] = false;
 	}
 
@@ -14,8 +14,6 @@ IsingModel::IsingModel(int size, double t) :rng{ rd() }, uni(0, size), r(0, 1),a
 }
 IsingModel::~IsingModel() {
 	delete[] this->lattice;
-	delete[] this->energy;
-	delete[] this->magnetization;
 }
 int IsingModel::get_site(int x, int y) {
 	// Implicitly Perodic conditions - if x/y out of range, wrap to be in the lattice somewhere (infinite lattice appx) 
@@ -32,13 +30,10 @@ void IsingModel::flip_site(int x, int y) {
 }
 
 void IsingModel::start(int max_iterations, int sample_every, int delay) {
-	if (energy != nullptr) delete[] this->energy;
-	if (magnetization != nullptr) delete[] this->magnetization;
-	this->energy = new double[max_iterations - delay];
-	this->magnetization = new double[max_iterations - delay];
-	this->arrLen = max_iterations - delay;
-	this->energy[0] = this->calc_energy();
-	this->magnetization[0] = this->calc_magnetization();
+	this->e = this->calc_energy();
+	this->m = this->calc_magnetization();
+	this->last_e = this->calc_energy();
+	this->last_m = this->calc_magnetization();
 	int i = 1;
 	while (i < max_iterations) {
 		int iter_count = this->metropolis_step(i);
@@ -68,34 +63,14 @@ double IsingModel::calc_magnetization() {
 	return m;
 }
 
-double* IsingModel::get_energy()
-{
-	return this->energy;
-}
-
-double* IsingModel::get_magnetization()
-{
-	return this->magnetization;
-}
-
 double IsingModel::get_mean_energy()
 {
-	double e_bar = 0;
-	for (int i = 0; i < this->arrLen; i++) {
-		e_bar += this->energy[i];
-	}
-	return (double)e_bar / ((double)(this->size*this->size) * this->arrLen);
+	return this->e;
 }
 
 double IsingModel::get_abs_mean_magnitization()
 {
-	double m_bar = 0.0;
-	for (int i = 0; i < this->arrLen; i++) {
-		m_bar += this->magnetization[i];
-	}
-	double denom = (double)(this->size * this->size) * this->arrLen;
-	return abs(m_bar) / denom;
-
+	return abs(this->m)/((double)this->size*(double)this->size);
 }
 
 int IsingModel::metropolis_step(int i) {
@@ -111,14 +86,30 @@ int IsingModel::metropolis_step(int i) {
 	double r = this->r(this->rng);
 	if (deltaE <= 0 || r <= p) {
 		this->flip_site(randX, randY);
-		this->energy[i] = this->energy[i - 1] + (double)deltaE;
+		this->e = (this->e * i + this->last_e + deltaE) / (i + 1);
+
 		double dm = (2.0 * (double)this->get_site(randX, randY));
-		this->magnetization[i] = this->magnetization[i - 1] + dm;
+		this->m = (this->m * i + this->last_m + dm) / (i + 1);
+
+
+		this->esq = (this->esq * i + (this->last_e + deltaE) * (this->last_e * deltaE)) / (i + 1);
+		this->msq = (this->msq * i + (this->last_m + dm) * (this->last_m + dm)) / (i + 1);
+
+		this->last_e += deltaE;
+		this->last_m += dm;
 	}
 	else {
-		this->energy[i] = this->energy[i - 1];
-		this->magnetization[i] = this->magnetization[i - 1];
+		this->e = (this->e * i + this->last_e) / (i + 1);
+		this->m = (this->m * i + this->last_m) / (i + 1);
 	}
 	return 1;
 }
 
+
+double IsingModel::get_e_variance() {
+	return this->esq - this->e * this->e;
+}
+
+double IsingModel::get_m_variance() {
+	return this->msq - this->m * this->m;
+}
