@@ -20,8 +20,14 @@ class IsingLattice:
         else:
             self.lattice = [[random.choice((-1, 1)) for i in range(self.size)] for j in range(self.size)]
 
-        self.magnetization = [self.cur_magnetization()]
-        self.energy = [self.energy_periodic()]
+        self.m = self.cur_magnetization()
+        self.e = self.energy_periodic()
+        self.last_e = self.e
+        self.last_m = self.m
+
+        self.esq = self.e * self.e
+        self.msq = self.m * self.m
+
         self.record_states = []
 
     def energy_periodic(self):
@@ -67,20 +73,6 @@ class IsingLattice:
                 magnetization += spin
         return np.abs(magnetization / (self.size ** 2))
         # Flip the configuration spin
-
-    def add_e_and_m(self):
-        E, m = 0, 0
-        for y in range(len(self.lattice)):
-            for x in range(len(self.lattice[y])):
-                E += -1 * self.lattice[y][x] * (
-                        self.lattice[(y + 1) % self.size][x] +
-                        self.lattice[(y - 1) % self.size][x] +
-                        self.lattice[y][(x + 1) % self.size] +
-                        self.lattice[y][(x - 1) % self.size]
-                )
-                m += self.lattice[y][x]
-        self.energy.append(E)
-        self.magnetization.append(np.abs(m / (self.size ** 2)))
 
     def __wolff_step(self, f=0, im=None, max_iter=0, batch=0, record=False):
         '''
@@ -135,13 +127,15 @@ class IsingLattice:
             if deltaE <= 0 or r <= w:
                 self.lattice[rand_y][rand_x] *= -1
                 if record:
-                    self.magnetization.append(
-                        self.magnetization[-1] + 2 * self.lattice[rand_y][rand_x] / (self.size ** 2))
-                    self.energy.append(self.energy[-1] + deltaE)
-            else:
-                if record:
-                    self.magnetization.append(self.magnetization[-1])
-                    self.energy.append(self.energy[-1])
+                    self.last_m += (2 * self.lattice[rand_y][rand_x] / (self.size ** 2))
+                    self.last_e += deltaE
+            if record:
+                self.m += (self.m * (f + i) + self.last_m) / (f + i + 1)
+                self.e += (self.e * (f + i) + self.last_e) / (f + i + 1)
+
+                self.esq += (self.esq * (f + i) + self.last_e ** 2) / (f + 1 + i)
+                self.msq += (self.msq * (f + i) + self.last_m ** 2) / (f + i + 1)
+
         if im:
             im.set_data(self.lattice)
             return im,
@@ -157,9 +151,9 @@ class IsingLattice:
         with tqdm(total=max_iter) as pbar:
             while i < max_iter:
                 if method == 'metropolis':
-                    steps = self.__metropolis_step(record=i >= delay)
+                    steps = self.__metropolis_step(f=i, record=i >= delay)
                 elif method == 'wolff':
-                    steps = self.__wolff_step(record=i > delay)
+                    steps = self.__wolff_step(f=i, record=i > delay)
                 else:
                     raise ValueError(f"{method} is not a supported iteration method. Please choose from 'wolff' or 'metropolis' ")
 
@@ -187,7 +181,7 @@ class IsingLattice:
             plt.legend()
             plt.show()
 
-        return self.__dict__
+        return self.e, self.m, self.esq - self.e ** 2,self.msq - self.m**2
 
     def start_animation(self, method='metropolis', max_iter=500000, batch=1):
         import matplotlib.animation as animation
@@ -200,7 +194,7 @@ class IsingLattice:
                                 interval=0,
                                 repeat=False)
         plt.show()
-        return self.__dict__
+        return self.e, self.m, self.esq - self.e ** 2,self.msq - self.m**2
 
 
 def load_show_image(path):
@@ -267,25 +261,25 @@ if __name__ == '__main__':
     min_res = 10 / (4 * size)
     kt = np.linspace(T_CRIT_ONS - min_res, T_CRIT_ONS + min_res, 2)
 
-    m = []
+    M = []
     E = []
     C_v = []
     chi = []
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(size, t, t < T_CRIT_ONS)
-        result_json = ising.start('metropolis', 25000000, 0, 0)
-        # result_json = ising.start_animation('metropolis', 1000000, 2500)
-        ttgen.add(result_json['record_states'], t, result_json['critical'])
-        m.append(np.abs(np.mean(result_json['magnetization'])))
-        E.append(np.mean(result_json['energy']))
-        C_v.append(np.var(result_json['energy']) / ((t ** 2) * 2500))
-        chi.append(np.var(result_json['magnetization']) / t)
-    ttgen.write(f"../dumps/{dt.now().strftime('%d-%m-%Y %H-%M-%S')}dump.json")
+        e,m,e_var,m_var = ising.start('metropolis', 1000000, 0, 0)
+        #e,m,e_var,m_var = ising.start_animation('metropolis', 1000000, 2500)
+        ttgen.add(ising.record_states, t, ising.critical)
+        M.append(m)
+        E.append(e)
+        C_v.append(e_var / ((t ** 2) * 2500))
+        chi.append(m_var/ t)
+    ttgen.write(f"dumps/{dt.now().strftime('%d-%m-%Y %H-%M-%S')}dump.json")
     plt.subplot(2, 2, 1)
     plt.title("Absolute Magnetization per spin")
     plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
-    plt.plot(kt, m)
+    plt.plot(kt, M)
     plt.subplot(2, 2, 2)
     plt.title("Energy per spin")
     plt.plot(kt, E)
