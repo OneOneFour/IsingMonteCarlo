@@ -1,7 +1,7 @@
 #include "IsingModel.h"
 
 
-IsingModel::IsingModel(int size, double t) :rng{ rd() }, uni(0, size), r(0, 1),e(0),m(0),last_e(0),last_m(0),esq(0),msq(0) {
+IsingModel::IsingModel(int size, double t) :rng{ rd() }, uni(0, size), r(0, 1), e(0), m(0), last_e(0), last_m(0), esq(0), msq(0) {
 	this->size = size;
 	this->t = t;
 	this->lattice = new bool[this->size * this->size];
@@ -45,8 +45,8 @@ void IsingModel::start(int max_iterations, int sample_every, int delay) {
 	while (i < max_iterations) {
 		int iter_count = this->metropolis_step(i);
 		i += iter_count;
-		if (i >= delay && i %sample_every == 0) {
-			bool* state = new bool[this->size*this->size];
+		if (i >= delay && i % sample_every == 0) {
+			bool* state = new bool[this->size * this->size];
 			memcpy(state, this->lattice, this->size * this->size * sizeof(bool));
 			this->record_states.push_back(state);
 		}
@@ -61,17 +61,17 @@ std::string get_json_str(bool* arr, int size, bool supercrit) {
 		str += "[";
 		for (int x = 0; x < size; x++, i++) {
 			str += std::to_string(((int)arr[i]) * 2 - 1);
-			if(x != size -1) str += ",";
+			if (x != size - 1) str += ",";
 		}
 		str += "],";
-		
+
 	}
 	str += "]}";
 	return str;
 }
 
 bool IsingModel::get_supercritical() {
-	return this->t > 2 / log(1 + sqrt(2)); 
+	return this->t > 2 / log(1 + sqrt(2));
 }
 
 double IsingModel::calc_energy() {
@@ -103,7 +103,7 @@ double IsingModel::get_mean_energy()
 
 double IsingModel::get_abs_mean_magnitization()
 {
-	return abs(this->m)/((double)this->size*(double)this->size);
+	return abs(this->m) / ((double)this->size * (double)this->size);
 }
 
 int IsingModel::metropolis_step(int i) {
@@ -124,23 +124,22 @@ int IsingModel::metropolis_step(int i) {
 		double dm = (2.0 * (double)this->get_site(randX, randY));
 		this->m = (this->m * i + this->last_m + dm) / (i + 1);
 
-
-		this->esq = (this->esq * i + (this->last_e + deltaE) * (this->last_e * deltaE)) / (i + 1);
-		this->msq = (this->msq * i + (this->last_m + dm) * (this->last_m + dm)) / (i + 1);
-
 		this->last_e += deltaE;
 		this->last_m += dm;
+		
 	}
-	else {
-		this->e = (this->e * i + this->last_e) / (i + 1);
-		this->m = (this->m * i + this->last_m) / (i + 1);
-	}
+	this->e += (this->last_e - this->e) / (i);
+	this->m += (this->last_m - this->m) / (i);
+
+	this->esq += (this->last_e * this->last_e - this->esq) / i;
+	this->msq += (this->last_m * this->last_m - this->msq) / i;
+
 	return 1;
 }
 
 
 double IsingModel::get_e_variance() {
-	return this->esq - this->e * this->e;
+	return this->esq - (this->e * this->e);
 }
 
 double IsingModel::get_m_variance() {
