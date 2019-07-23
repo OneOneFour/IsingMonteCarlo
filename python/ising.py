@@ -181,7 +181,7 @@ class IsingLattice:
             plt.legend()
             plt.show()
 
-        return self.e, self.m, self.esq - self.e ** 2,self.msq - self.m**2
+        return self.e, self.m, self.esq - self.e ** 2, self.msq - self.m ** 2
 
     def start_animation(self, method='metropolis', max_iter=500000, batch=1):
         import matplotlib.animation as animation
@@ -194,7 +194,7 @@ class IsingLattice:
                                 interval=0,
                                 repeat=False)
         plt.show()
-        return self.e, self.m, self.esq - self.e ** 2,self.msq - self.m**2
+        return self.e, self.m, self.esq - self.e ** 2, self.msq - self.m ** 2
 
 
 def load_show_image(path):
@@ -212,13 +212,29 @@ class TestTrainSetGenerator:
         self.size = size
         self.__images = []
 
+    @staticmethod
+    def upgrade(dir):
+        import glob
+        os.chdir(dir)
+        for file in glob.iglob('*.json'):
+            obj = TestTrainSetGenerator()
+            try:
+                with open(file,'r') as f:
+                    obj.__dict__ = json.load(f)
+            except Exception as e:
+                print(f"Exception in file: {file}")
+                raise e
+            finally:
+                obj.write(file)
+
     def write(self, fname):
         with open(fname, 'w') as f:
-            json.dump(self.__dict__, f)
+            json.dump({'images': self.__images}, f)
 
     def load(self, fname):
         with open(fname) as f:
-            self.__dict__ = json.load(f)
+            inbound_dict = json.load(f)
+            self.__images = inbound_dict['images']
 
     def clean(self):
         self.__images = [i for i in self.__images if isinstance(i['image'], list)]
@@ -268,13 +284,13 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(size, t, t < T_CRIT_ONS)
-        e,m,e_var,m_var = ising.start('metropolis', 1000000, 0, 0)
-        #e,m,e_var,m_var = ising.start_animation('metropolis', 1000000, 2500)
+        e, m, e_var, m_var = ising.start('metropolis', 1000000, 0, 0)
+        # e,m,e_var,m_var = ising.start_animation('metropolis', 1000000, 2500)
         ttgen.add(ising.record_states, t, ising.critical)
         M.append(m)
         E.append(e)
         C_v.append(e_var / ((t ** 2) * 2500))
-        chi.append(m_var/ t)
+        chi.append(m_var / t)
     ttgen.write(f"dumps/{dt.now().strftime('%d-%m-%Y %H-%M-%S')}dump.json")
     plt.subplot(2, 2, 1)
     plt.title("Absolute Magnetization per spin")

@@ -1,6 +1,11 @@
 #pragma once
 #include <random> 
+#include <string>
 #include <math.h>
+#include <vector>
+
+std::string get_json_str(bool* arr, int size, bool supercrit);
+
 class IsingModel {
 public:
 	IsingModel(int size, double t);
@@ -12,9 +17,12 @@ public:
 	double get_mean_energy();
 	double get_abs_mean_magnitization();
 
+	bool get_supercritical();
+
 	double get_e_variance();
 	double get_m_variance();
 
+	std::vector<bool*> record_states;
 private:
 	int metropolis_step(int i);
 	//int wolff_step();
@@ -28,6 +36,7 @@ private:
 	double esq;
 	double msq;
 	double last_e, last_m;
+
 	std::random_device rd;
 	std::mt19937 rng;
 	std::uniform_int_distribution<int> uni;

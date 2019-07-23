@@ -106,6 +106,7 @@
   <ItemGroup>
     <ClInclude Include="C2PyPlot.h" />
     <ClInclude Include="IsingModel.h" />
+    <ClInclude Include="json.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

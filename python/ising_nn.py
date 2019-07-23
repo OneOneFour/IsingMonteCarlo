@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from ising import TestTrainSetGenerator
 from datetime import datetime as dt
-
+import neptune
 
 def plot_image(image, label):
     plt.xticks([])
@@ -26,8 +26,15 @@ def plot_image_with_nn(image, label, prediction):
 
 
 if __name__ == '__main__':
-    ttfing = TestTrainSetGenerator(0.9)
-    ttfing.load(f"18-07-2019 15-29-58dump.json")
+    ttfing = TestTrainSetGenerator(0.9,100)
+    ttfing.load(f"dumps/18-07-2019 15-29-58dump.json")
+
+    neptune.init(api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5tbCIsImFwaV9rZXkiOiJhNzRhMWY2Ni03YThiLTRmMWUtODlhNC0wMTFhZTYxNzY4YjYifQ==',
+                 project_qualified_name='oneonefour/Ising-Model')
+
+    neptune.create_experiment()
+
+
 
     (train_images, train_labels), (test_images, test_labels) = ttfing.get_data()
 
@@ -50,16 +57,18 @@ if __name__ == '__main__':
         metrics=["accuracy"]
     )
 
-    # log_dir = f"logs\\fit\{dt.now().strftime('%Y%m%d-%H%M%S')}"
-    # tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+    log_dir = f"logs\\fit\{dt.now().strftime('%Y%m%d-%H%M%S')}"
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
 
-    model.fit(train_images,
+    history = model.fit(train_images,
               train_labels,
               epochs=10,
               validation_data=(test_images, test_labels),
-              # callbacks=[tensorboard_callback]
-              )
+              callbacks=[tensorboard_callback]
+      )
 
+    neptune.send_metric('acc', acc)
+    neptune.stop()
     predict = model.predict(test_images)
     for i, img in enumerate(test_images[:10]):
         plot_image_with_nn(img, test_labels[i], predict[i])
