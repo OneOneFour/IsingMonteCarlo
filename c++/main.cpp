@@ -11,7 +11,7 @@ constexpr auto ARR_LEN = 100;
 std::vector<double> linspace(const double start, const double end, const int n_samples= 2) {
 	std::vector<double> a(n_samples);
 	double val;
-	double step = (end - start) / n_samples;
+	double step = (end - start) / (n_samples - 1);
 	for (double i = 0,val=start; (int)i < n_samples;i++,val+=step) {
 		a[(int)i] = val;
 	}
@@ -19,7 +19,7 @@ std::vector<double> linspace(const double start, const double end, const int n_s
 }
 
 
-void getData(const double start_temp, const double end_temp, const int N_steps, std::string path,int iterations=25000000) {
+void getData(const double start_temp, const double end_temp, const int N_steps, std::string path,int iterations=1000000) {
 	std::vector<double> t = linspace(start_temp, end_temp, N_steps);
 	std::vector<double> e(N_steps);
 	std::vector<double> m(N_steps);
@@ -34,7 +34,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 		IsingModel model(50, t[i]);
 		
 		
-		model.start(iterations, 100000, 250000);
+		model.start(iterations, 500000, 20000000);
 #pragma omp critical
 		{
 			std::cout << "Temperature: " << t[i] << std::endl;
@@ -77,7 +77,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 
 int main()
 {
-	getData(2.0, 2.5, 50, "test_dump.json");
+	getData(2.2, 2.3,2, "test_dump.json",50000000);
 	return 0;
 }
 

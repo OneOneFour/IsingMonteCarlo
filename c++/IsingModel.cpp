@@ -20,30 +20,28 @@ IsingModel::~IsingModel() {
 }
 int IsingModel::get_site(int x, int y) {
 	// Implicitly Perodic conditions - if x/y out of range, wrap to be in the lattice somewhere (infinite lattice appx) 
-	int x_p = x % this->size;
-	int y_p = y % this->size;
+	int x_p = (this->size + x % this->size)% this->size;
+	int y_p = (this->size +y % this->size) %this->size;
 	int result = this->lattice[x_p + y_p * this->size];
 	return result * 2 - 1;
 }
 
 void IsingModel::flip_site(int x, int y) {
-	int x_p = x % this->size;
-	int y_p = y % this->size;
+	int x_p = (this->size + x % this->size) % this->size;
+	int y_p = (this->size + y % this->size) % this->size;
 	this->lattice[x_p + y_p * this->size] = !this->lattice[x_p + y_p * this->size];
 }
 
 void IsingModel::start(int max_iterations, int sample_every, int delay) {
-	this->e = this->calc_energy();
-	this->m = this->calc_magnetization();
 	this->last_e = this->calc_energy();
 	this->last_m = this->calc_magnetization();
 
 	// Potential future optimization 
 	//this->record_states.resize((max_iterations - delay) / sample_every);
 
-	int i = 1;
+	int i = 0;
 	while (i < max_iterations) {
-		int iter_count = this->metropolis_step(i);
+		int iter_count = this->metropolis_step(i - delay);
 		i += iter_count;
 		if (i >= delay && i % sample_every == 0) {
 			bool* state = new bool[this->size * this->size];
@@ -128,12 +126,19 @@ int IsingModel::metropolis_step(int i) {
 		this->last_m += dm;
 		
 	}
-	this->e += (this->last_e - this->e) / (i);
-	this->m += (this->last_m - this->m) / (i);
+	if (i == 0) {
+		this->e = this->last_e;
+		this->m = this->last_m;
+		this->esq = this->last_e * this->last_e;
+		this->msq = this->last_m * this->last_m;
+	}
+	if (i > 0) {
+		this->e += (this->last_e - this->e) / ((double)i);
+		this->m += (this->last_m - this->m) / ((double)i);
 
-	this->esq += (this->last_e * this->last_e - this->esq) / i;
-	this->msq += (this->last_m * this->last_m - this->msq) / i;
-
+		this->esq += (this->last_e * this->last_e - this->esq) / (double)i;
+		this->msq += (this->last_m * this->last_m - this->msq) / (double)i;
+	}
 	return 1;
 }
 
