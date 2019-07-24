@@ -130,11 +130,11 @@ class IsingLattice:
                     self.last_m += (2 * self.lattice[rand_y][rand_x] / (self.size ** 2))
                     self.last_e += deltaE
             if record:
-                self.m += (self.m * (f + i) + self.last_m) / (f + i + 1)
-                self.e += (self.e * (f + i) + self.last_e) / (f + i + 1)
+                self.m += (self.last_m - self.m)/(f+i+1)
+                self.e += (self.last_e - self.e)/(f+i+1)
 
-                self.esq += (self.esq * (f + i) + self.last_e ** 2) / (f + 1 + i)
-                self.msq += (self.msq * (f + i) + self.last_m ** 2) / (f + i + 1)
+                self.esq += (self.last_e*self.last_e - self.esq)/(f+i+1)
+                self.msq += (self.last_m*self.last_m - self.msq)/(f+i+1)
 
         if im:
             im.set_data(self.lattice)

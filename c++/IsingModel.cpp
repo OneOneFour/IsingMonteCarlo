@@ -1,7 +1,7 @@
 #include "IsingModel.h"
 
 
-IsingModel::IsingModel(int size, double t) :rng{ rd() }, uni(0, size), r(0, 1), e(0), m(0), last_e(0), last_m(0), esq(0), msq(0) {
+IsingModel::IsingModel(int size, double t) :rng{ rd() }, uni(0, size-1), r(0, 1), e(0), m(0), last_e(0), last_m(0), esq(0), msq(0) {
 	this->size = size;
 	this->t = t;
 	this->lattice = new bool[this->size * this->size];
@@ -117,11 +117,9 @@ int IsingModel::metropolis_step(int i) {
 	double r = this->r(this->rng);
 	if (deltaE <= 0 || r <= p) {
 		this->flip_site(randX, randY);
-		this->e = (this->e * i + this->last_e + deltaE) / (i + 1);
 
 		double dm = (2.0 * (double)this->get_site(randX, randY));
-		this->m = (this->m * i + this->last_m + dm) / (i + 1);
-
+	
 		this->last_e += deltaE;
 		this->last_m += dm;
 		
@@ -132,7 +130,7 @@ int IsingModel::metropolis_step(int i) {
 		this->esq = this->last_e * this->last_e;
 		this->msq = this->last_m * this->last_m;
 	}
-	if (i > 0) {
+	else if (i > 0) {
 		this->e += (this->last_e - this->e) / ((double)i);
 		this->m += (this->last_m - this->m) / ((double)i);
 

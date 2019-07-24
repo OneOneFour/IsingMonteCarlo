@@ -29,12 +29,12 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 	std::string output = "[";
 
 	Plotter p;
-#pragma omp parallel for
+//#pragma omp parallel for
 	for (int i = 0; i < N_steps; i++) {
 		IsingModel model(50, t[i]);
 		
 		
-		model.start(iterations, 500000, 20000000);
+		model.start(iterations, 150000, 500000);
 #pragma omp critical
 		{
 			std::cout << "Temperature: " << t[i] << std::endl;
@@ -77,7 +77,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 
 int main()
 {
-	getData(2.2, 2.3,2, "test_dump.json",50000000);
+	getData(2.2, 2.3,50, "fiftypointt2-3_2-2json",2500000);
 	return 0;
 }
 
