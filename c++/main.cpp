@@ -6,6 +6,8 @@
 #include <fstream>
 #include "C2PyPlot.h"
 constexpr auto ARR_LEN = 100;
+const double T_CRIT = 2.0 / log(1.0 + sqrt(2.0));
+
 
 // YES I KNOW THIS IS RAM INEFFICENT BLAH BLAH BLAH 
 std::vector<double> linspace(const double start, const double end, const int n_samples= 2) {
@@ -29,12 +31,12 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 	std::string output = "[";
 
 	Plotter p;
-//#pragma omp parallel for
+#pragma omp parallel for
 	for (int i = 0; i < N_steps; i++) {
-		IsingModel model(50, t[i]);
+		IsingModel model(50, t[i],iterations);
 		
 		
-		model.start(iterations, 150000, 500000);
+		model.start(5000,100 );
 #pragma omp critical
 		{
 			std::cout << "Temperature: " << t[i] << std::endl;
@@ -77,7 +79,8 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 
 int main()
 {
-	getData(2.2, 2.3,50, "fiftypointt2-3_2-2json",2500000);
+	double range = 5.0 / (4.0 * 50);
+	getData(T_CRIT - range*1.5,T_CRIT + range*1.5,2, "doub.json",1000000);
 	return 0;
 }
 

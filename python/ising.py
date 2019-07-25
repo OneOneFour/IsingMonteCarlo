@@ -20,15 +20,9 @@ class IsingLattice:
         else:
             self.lattice = [[random.choice((-1, 1)) for i in range(self.size)] for j in range(self.size)]
 
+        self.record_states = []
         self.m = self.cur_magnetization()
         self.e = self.energy_periodic()
-        self.last_e = self.e
-        self.last_m = self.m
-
-        self.esq = self.e * self.e
-        self.msq = self.m * self.m
-
-        self.record_states = []
 
     def energy_periodic(self):
         E = 0
@@ -74,7 +68,7 @@ class IsingLattice:
         return np.abs(magnetization / (self.size ** 2))
         # Flip the configuration spin
 
-    def __wolff_step(self, f=0, im=None, max_iter=0, batch=0, record=False):
+    def __wolff_step(self, i=0, im=None, max_iter=0):
         '''
         Work using bonds as opposed to individual spins on the lattice.
         Converts problem to a percolation problem which unlike Metropolis does not fall in to inf relaxation time at the critical
@@ -101,18 +95,16 @@ class IsingLattice:
 
         for p in cluster:
             self.lattice[p[0]][p[1]] *= -1
-        if record:
-            self.add_e_and_m()
         if im:
             im.set_data(self.lattice)
             return im,
         else:
             return len(cluster)
 
-    def __metropolis_step(self, f=0, im=None, max_iter=5000, batch=1, record=False):
-        for i in range(batch):
+    def __metropolis_step(self, i=0, im=None, max_iter=5000):
+        for j in range(self.size ** 2):
             if im:
-                if f >= max_iter - 1:
+                if i >= max_iter - 1:
                     plt.close()
                 # print(f"\rFrame:{f} of 5000", end='')
             rand_y, rand_x = np.random.randint(0, self.size, size=2)
@@ -126,34 +118,31 @@ class IsingLattice:
             w = np.exp((-1 / self.kT) * deltaE)
             if deltaE <= 0 or r <= w:
                 self.lattice[rand_y][rand_x] *= -1
-                if record:
-                    self.last_m += (2 * self.lattice[rand_y][rand_x] / (self.size ** 2))
-                    self.last_e += deltaE
-            if record:
-                self.m += (self.last_m - self.m)/(f+i+1)
-                self.e += (self.last_e - self.e)/(f+i+1)
-
-                self.esq += (self.last_e*self.last_e - self.esq)/(f+i+1)
-                self.msq += (self.last_m*self.last_m - self.msq)/(f+i+1)
+                self.m += (2 * self.lattice[rand_y][rand_x] / (self.size ** 2))
+                self.e += deltaE
 
         if im:
             im.set_data(self.lattice)
             return im,
-        else:
-            return batch
+        return 1
 
     def start(self, method='metropolis', max_iter=5000, export_every=0, delay=0, log_correlation=False):
         if log_correlation:
             corrcoeff = []
         if export_every != 0:
             self.record_states = []
-        i = 0
+        i = 1
+        sum_e = self.e
+        sum_m = self.m
+        sum_abs_m = abs(self.m)
+        sum_esq = self.e * self.e
+        sum_msq = self.m * self.m
         with tqdm(total=max_iter) as pbar:
             while i < max_iter:
                 if method == 'metropolis':
-                    steps = self.__metropolis_step(f=i, record=i >= delay)
+                    steps = self.__metropolis_step(i=i)
                 elif method == 'wolff':
-                    steps = self.__wolff_step(f=i, record=i > delay)
+                    steps = self.__wolff_step(i=i)
                 else:
                     raise ValueError(f"{method} is not a supported iteration method. Please choose from 'wolff' or 'metropolis' ")
 
@@ -176,20 +165,27 @@ class IsingLattice:
                 # Update progress bar and loop progress
                 i += steps
                 pbar.update(steps)
+                sum_e += self.e
+                sum_m += self.m
+                sum_abs_m += abs(self.m)
+                sum_esq += self.e * self.e
+                sum_msq += self.m * self.m
+
         if log_correlation:
             plt.title(f"R^2 correlation at T:{self.kT}")
             plt.legend()
             plt.show()
 
-        return self.e, self.m, self.esq - self.e ** 2, self.msq - self.m ** 2
+        return sum_e / (max_iter), sum_abs_m/ max_iter, sum_esq / (max_iter) - (sum_e / (max_iter)) ** 2, sum_msq / max_iter - (
+                    sum_m / max_iter) ** 2
 
-    def start_animation(self, method='metropolis', max_iter=500000, batch=1):
+    def start_animation(self, method='metropolis', max_iter=500000):
         import matplotlib.animation as animation
         fig, ax = plt.subplots()
 
         im = plt.imshow(self.lattice, cmap='jet', animated=True, vmin=-1, vmax=1)
 
-        animation.FuncAnimation(fig, self.__wolff_step if method == 'wolff' else self.__metropolis_step, fargs=(im, max_iter, batch), blit=True,
+        animation.FuncAnimation(fig, self.__wolff_step if method == 'wolff' else self.__metropolis_step, fargs=(im, max_iter), blit=True,
                                 frames=max_iter,
                                 interval=0,
                                 repeat=False)
@@ -219,7 +215,7 @@ class TestTrainSetGenerator:
         for file in glob.iglob('*.json'):
             obj = TestTrainSetGenerator()
             try:
-                with open(file,'r') as f:
+                with open(file, 'r') as f:
                     obj.__dict__ = json.load(f)
             except Exception as e:
                 print(f"Exception in file: {file}")
@@ -272,10 +268,10 @@ class TestTrainSetGenerator:
 
 if __name__ == '__main__':
     # np.seterr(all='raise')
-    size = 100
+    size = 50
     ttgen = TestTrainSetGenerator(size=size)
     min_res = 10 / (4 * size)
-    kt = np.linspace(T_CRIT_ONS - min_res, T_CRIT_ONS + min_res, 2)
+    kt = np.linspace(2.2, 2.3, 10)
 
     M = []
     E = []
@@ -284,8 +280,8 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(size, t, t < T_CRIT_ONS)
-        e, m, e_var, m_var = ising.start('metropolis', 1000000, 0, 0)
-        # e,m,e_var,m_var = ising.start_animation('metropolis', 1000000, 2500)
+        e, m, e_var, m_var = ising.start('metropolis', 5000, 0, 0)
+        # e,m,e_var,m_var = ising.start_animation('metropolis', 1000000)
         ttgen.add(ising.record_states, t, ising.critical)
         M.append(m)
         E.append(e)

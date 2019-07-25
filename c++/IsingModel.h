@@ -8,9 +8,9 @@ std::string get_json_str(bool* arr, int size, bool supercrit);
 
 class IsingModel {
 public:
-	IsingModel(int size, double t);
+	IsingModel(int size, double t,int iterations);
 	~IsingModel();
-	void start(int max_iterations,int record_every,int delay);
+	void start(int record_every,int delay);
 	double calc_energy();
 	double calc_magnetization();
 
@@ -33,10 +33,12 @@ private:
 	double t;
 	double e;
 	double m;
-	double esq;
-	double msq;
-	double last_e, last_m;
-
+	double sum_m;
+	double sum_e;
+	double sum_esq;
+	double sum_msq;
+	double abs_m;
+	int iterations;
 	std::random_device rd;
 	std::mt19937 rng;
 	std::uniform_int_distribution<int> uni;

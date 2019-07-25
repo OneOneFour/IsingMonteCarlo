@@ -1,7 +1,10 @@
 #include "IsingModel.h"
 
 
-IsingModel::IsingModel(int size, double t) :rng{ rd() }, uni(0, size-1), r(0, 1), e(0), m(0), last_e(0), last_m(0), esq(0), msq(0) {
+IsingModel::IsingModel(int size, double t,int iterations) :rng{ rd() }, uni(0.0, size-1), r(0.0, 1.0), e(0),
+															m(0), sum_esq(0), sum_msq(0),iterations(iterations),
+															sum_m(0),sum_e(0),abs_m(0)
+{
 	this->size = size;
 	this->t = t;
 	this->lattice = new bool[this->size * this->size];
@@ -32,22 +35,25 @@ void IsingModel::flip_site(int x, int y) {
 	this->lattice[x_p + y_p * this->size] = !this->lattice[x_p + y_p * this->size];
 }
 
-void IsingModel::start(int max_iterations, int sample_every, int delay) {
-	this->last_e = this->calc_energy();
-	this->last_m = this->calc_magnetization();
+void IsingModel::start(int sample_every, int delay) {
 
 	// Potential future optimization 
 	//this->record_states.resize((max_iterations - delay) / sample_every);
-
+	this->m = this->calc_magnetization();
+	this->e = this->calc_energy();
 	int i = 0;
-	while (i < max_iterations) {
-		int iter_count = this->metropolis_step(i - delay);
-		i += iter_count;
+	while (i < this->iterations) {
+		this->metropolis_step(++i);
 		if (i >= delay && i % sample_every == 0) {
 			bool* state = new bool[this->size * this->size];
 			memcpy(state, this->lattice, this->size * this->size * sizeof(bool));
 			this->record_states.push_back(state);
 		}
+		this->sum_e += this->e;
+		this->sum_m += this->m;
+		this->sum_esq += this->e * this->e;
+		this->sum_msq += this->m * this->m;
+		this->abs_m += abs(this->m);
 	}
 }
 
@@ -96,55 +102,44 @@ double IsingModel::calc_magnetization() {
 
 double IsingModel::get_mean_energy()
 {
-	return this->e;
+	return this->sum_e/this->iterations;
 }
 
 double IsingModel::get_abs_mean_magnitization()
 {
-	return abs(this->m) / ((double)this->size * (double)this->size);
+	return abs_m/ ((double)this->size * (double)this->size * (double)this->iterations);
 }
 
-int IsingModel::metropolis_step(int i) {
-	int randX = this->uni(this->rng);
-	int randY = this->uni(this->rng);
-	int deltaE = 2 * this->get_site(randX, randY) * (
-		this->get_site(randX + 1, randY) +
-		this->get_site(randX - 1, randY) +
-		this->get_site(randX, randY + 1) +
-		this->get_site(randX, randY - 1)
-		);
-	double p = exp(-(double)deltaE / this->t);
-	double r = this->r(this->rng);
-	if (deltaE <= 0 || r <= p) {
-		this->flip_site(randX, randY);
+int IsingModel::metropolis_step(int i ) {
+	for (int j = 0; j < this->size * this->size; j++) {
+		int randX = this->uni(this->rng);
+		int randY = this->uni(this->rng);
+		int deltaE = 2 * this->get_site(randX, randY) * (
+			this->get_site(randX + 1, randY) +
+			this->get_site(randX - 1, randY) +
+			this->get_site(randX, randY + 1) +
+			this->get_site(randX, randY - 1)
+			);
+		double p = exp(-(double)deltaE / this->t);
+		double r = this->r(this->rng);
+		if (deltaE <= 0 || r <= p) {
+			this->flip_site(randX, randY);
 
-		double dm = (2.0 * (double)this->get_site(randX, randY));
-	
-		this->last_e += deltaE;
-		this->last_m += dm;
-		
-	}
-	if (i == 0) {
-		this->e = this->last_e;
-		this->m = this->last_m;
-		this->esq = this->last_e * this->last_e;
-		this->msq = this->last_m * this->last_m;
-	}
-	else if (i > 0) {
-		this->e += (this->last_e - this->e) / ((double)i);
-		this->m += (this->last_m - this->m) / ((double)i);
+			double dm = (2.0 * (double)this->get_site(randX, randY));
 
-		this->esq += (this->last_e * this->last_e - this->esq) / (double)i;
-		this->msq += (this->last_m * this->last_m - this->msq) / (double)i;
+			this->e += deltaE;
+			this->m += dm;
+
+		}
 	}
 	return 1;
 }
 
 
 double IsingModel::get_e_variance() {
-	return this->esq - (this->e * this->e);
+	return this->sum_esq /this->iterations - this->get_mean_energy() * this->get_mean_energy();
 }
 
 double IsingModel::get_m_variance() {
-	return this->msq - this->m * this->m;
+	return this->sum_msq / this->iterations - (sum_m / this->iterations) * (sum_m / this->iterations);
 }
