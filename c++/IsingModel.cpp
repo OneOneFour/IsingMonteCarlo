@@ -70,7 +70,9 @@ std::string get_json_str(bool* arr, int size, bool supercrit) {
 		str += "],";
 
 	}
-	str += "]}";
+	str += "],temp:";
+	str += std::to_string(this->t);
+	str+="}";
 	return str;
 }
 

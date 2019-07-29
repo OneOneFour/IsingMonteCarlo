@@ -144,7 +144,8 @@ class IsingLattice:
                 elif method == 'wolff':
                     steps = self.__wolff_step(i=i)
                 else:
-                    raise ValueError(f"{method} is not a supported iteration method. Please choose from 'wolff' or 'metropolis' ")
+                    raise ValueError(
+                        f"{method} is not a supported iteration method. Please choose from 'wolff' or 'metropolis' ")
 
                 if export_every != 0 and i >= delay:
 
@@ -176,8 +177,9 @@ class IsingLattice:
             plt.legend()
             plt.show()
 
-        return sum_e / (max_iter), sum_abs_m/ max_iter, sum_esq / (max_iter) - (sum_e / (max_iter)) ** 2, sum_msq / max_iter - (
-                    sum_m / max_iter) ** 2
+        return sum_e / (max_iter), sum_abs_m / max_iter, sum_esq / (max_iter) - (
+                    sum_e / (max_iter)) ** 2, sum_msq / max_iter - (
+                       sum_m / max_iter) ** 2
 
     def start_animation(self, method='metropolis', max_iter=500000):
         import matplotlib.animation as animation
@@ -185,12 +187,13 @@ class IsingLattice:
 
         im = plt.imshow(self.lattice, cmap='jet', animated=True, vmin=-1, vmax=1)
 
-        animation.FuncAnimation(fig, self.__wolff_step if method == 'wolff' else self.__metropolis_step, fargs=(im, max_iter), blit=True,
+        animation.FuncAnimation(fig, self.__wolff_step if method == 'wolff' else self.__metropolis_step,
+                                fargs=(im, max_iter), blit=True,
                                 frames=max_iter,
                                 interval=0,
                                 repeat=False)
         plt.show()
-        return self.e, self.m, self.esq - self.e ** 2, self.msq - self.m ** 2
+        return None
 
 
 def load_show_image(path):
@@ -263,7 +266,7 @@ class TestTrainSetGenerator:
 
     def add(self, images, temp, critical):
         for image in images:
-            self.__images.append({'image': image, 'label': int(critical)})
+            self.__images.append({'image': image, 'label': int(critical), 'temp': temp})
 
 
 if __name__ == '__main__':
@@ -280,7 +283,7 @@ if __name__ == '__main__':
     for t in kt:
         print(f"\nIterating at temperature: {t}")
         ising = IsingLattice(size, t, t < T_CRIT_ONS)
-        e, m, e_var, m_var = ising.start('metropolis', 5000, 0, 0)
+        e, m, e_var, m_var = ising.start('metropolis', 100000, 0, 0)
         # e,m,e_var,m_var = ising.start_animation('metropolis', 1000000)
         ttgen.add(ising.record_states, t, ising.critical)
         M.append(m)
