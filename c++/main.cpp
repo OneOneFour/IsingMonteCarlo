@@ -36,7 +36,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 		IsingModel model(50, t[i],iterations);
 		
 		
-		model.start(5000,100 );
+		model.start(200,2000);
 #pragma omp critical
 		{
 			std::cout << "Temperature: " << t[i] << std::endl;
@@ -50,8 +50,8 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 			cv[i] = model.get_e_variance() / (t[i] * t[i]);
 			bool supercrit = t[i] >= 2.0 / log(1.0 + sqrt(2.0));
 			for (bool* arr : model.record_states) {	
-				output += get_json_str(arr, 50, supercrit);
-				output += ",";
+				output += get_json_str(arr, 50, supercrit,t[i]);
+				if(arr != model.record_states.back()) output += ",";
 			}
 		}
 		
@@ -80,7 +80,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 int main()
 {
 	double range = 5.0 / (4.0 * 50);
-	getData(T_CRIT - range*1.5,T_CRIT + range*1.5,2, "doub.json",1000000);
+	getData(T_CRIT - range*5,T_CRIT + range*5,8, "spectrum.json",500000);
 	return 0;
 }
 

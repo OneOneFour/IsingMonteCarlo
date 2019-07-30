@@ -4,7 +4,7 @@
 #include <math.h>
 #include <vector>
 
-std::string get_json_str(bool* arr, int size, bool supercrit);
+std::string get_json_str(bool* arr, int size, bool supercrit,double t);
 
 class IsingModel {
 public:

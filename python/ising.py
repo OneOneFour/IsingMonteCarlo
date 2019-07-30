@@ -228,12 +228,12 @@ class TestTrainSetGenerator:
 
     def write(self, fname):
         with open(fname, 'w') as f:
-            json.dump({'images': self.__images}, f)
+            json.dump(self.__images, f)
 
     def load(self, fname):
         with open(fname) as f:
             inbound_dict = json.load(f)
-            self.__images = inbound_dict['images']
+            self.__images = inbound_dict
 
     def clean(self):
         self.__images = [i for i in self.__images if isinstance(i['image'], list)]

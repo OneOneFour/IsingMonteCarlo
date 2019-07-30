@@ -57,9 +57,9 @@ void IsingModel::start(int sample_every, int delay) {
 	}
 }
 
-std::string get_json_str(bool* arr, int size, bool supercrit) {
+std::string get_json_str(bool* arr, int size, bool supercrit,double t) {
 	std::string str = "{\"label\":";
-	str += std::to_string((int)supercrit * 2 - 1);
+	str += std::to_string((int)supercrit);
 	str += ",\"image\":[";
 	for (int y = 0, i = 0; y < size; y++) {
 		str += "[";
@@ -67,11 +67,16 @@ std::string get_json_str(bool* arr, int size, bool supercrit) {
 			str += std::to_string(((int)arr[i]) * 2 - 1);
 			if (x != size - 1) str += ",";
 		}
-		str += "],";
+		if (y == size - 1) {
+			str += "]";
+		}
+		else {
+			str += "],";
+		}
 
 	}
-	str += "],temp:";
-	str += std::to_string(this->t);
+	str += "],\"temp\":";
+	str += std::to_string(t);
 	str+="}";
 	return str;
 }
