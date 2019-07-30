@@ -2,8 +2,8 @@ import numpy as np
 from tensorflow.python.keras import layers, models
 import matplotlib.pyplot as plt
 from ising import TestTrainSetGenerator
-
-
+from tensorflow.python.keras.callbacks import TensorBoard
+from time import time
 def plot_9_sample(images, labels):
     fig, axes = plt.subplots(3, 3)
     for i, ax in enumerate(fig.axes):
@@ -57,6 +57,7 @@ def perceptron_test(training_data, training_labels, validation_data, validation_
 
 
 def feed_forward(training_data, training_labels, validation_data, validation_labels, epochs):
+    tensorboard = TensorBoard(log_dir=f"logs/{time()}",)
     model = models.Sequential()
     model.add(layers.Flatten(input_shape=(50, 50,)))
     model.add(layers.Dense(128, activation='relu'))
@@ -64,16 +65,18 @@ def feed_forward(training_data, training_labels, validation_data, validation_lab
     model.add(layers.Dense(1, activation='sigmoid'))
     model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=['accuracy'])
     history = model.fit(training_data, training_labels, epochs=epochs, batch_size=64,
-                        validation_data=(validation_data, validation_labels))
+                        validation_data=(validation_data, validation_labels),
+                        callbacks = [tensorboard])
     hist_dict = history.history
     plot_train_val_loss(hist_dict, epochs)
     plot_train_val_acc(hist_dict, epochs)
+
     return model, hist_dict
 
 
 if __name__ == '__main__':
     ttsg = TestTrainSetGenerator()
-    ttsg.load(f"../json_dumps/broadtestset.json")
+    ttsg.load(f"../json_dumps/4points1mil.json")
     (train_images, train_labels), (test_images, test_labels) = ttsg.get_data()
 
     train_images = (train_images + 1) / 2

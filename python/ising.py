@@ -1,5 +1,7 @@
 import json
 import random
+from json import JSONDecodeError
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
@@ -232,7 +234,17 @@ class TestTrainSetGenerator:
 
     def load(self, fname):
         with open(fname) as f:
-            inbound_dict = json.load(f)
+            try:
+                inbound_dict = json.load(f)
+            except JSONDecodeError as err:
+                start, stop = max(0, err.pos - 20), min(err.pos + 20,len(err.doc))
+                snippet = err.doc[start:stop]
+                if err.pos < 20:
+                    snippet = '... ' + snippet
+                if err.pos + 20 < len(err.doc):
+                    snippet += ' ...'
+                print(snippet)
+                raise err
             self.__images = inbound_dict
 
     def clean(self):

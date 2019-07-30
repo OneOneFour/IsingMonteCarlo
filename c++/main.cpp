@@ -21,7 +21,8 @@ std::vector<double> linspace(const double start, const double end, const int n_s
 }
 
 
-void getData(const double start_temp, const double end_temp, const int N_steps, std::string path,int iterations=1000000) {
+void getData(const double start_temp, const double end_temp, const int N_steps, std::string path,int iterations=1000000,
+	int record_every = 200,int delay = 1000) {
 	std::vector<double> t = linspace(start_temp, end_temp, N_steps);
 	std::vector<double> e(N_steps);
 	std::vector<double> m(N_steps);
@@ -36,7 +37,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 		IsingModel model(50, t[i],iterations);
 		
 		
-		model.start(200,2000);
+		model.start(record_every,delay);
 #pragma omp critical
 		{
 			std::cout << "Temperature: " << t[i] << std::endl;
@@ -51,7 +52,9 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 			bool supercrit = t[i] >= 2.0 / log(1.0 + sqrt(2.0));
 			for (bool* arr : model.record_states) {	
 				output += get_json_str(arr, 50, supercrit,t[i]);
-				if(arr != model.record_states.back()) output += ",";
+				if(!(i == N_steps -1 && arr == model.record_states.back()))){
+				    output += ",";
+				}
 			}
 		}
 		
@@ -80,7 +83,9 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 int main()
 {
 	double range = 5.0 / (4.0 * 50);
-	getData(T_CRIT - range*5,T_CRIT + range*5,8, "spectrum.json",500000);
+	getData(2.0,3.0,20, "spectrum.json",250000);
+	getData();
+	getData9
 	return 0;
 }
 

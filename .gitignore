@@ -350,3 +350,5 @@ MigrationBackup/
 
 *.idea
 dumps/
+json_dumps/
+logs/
