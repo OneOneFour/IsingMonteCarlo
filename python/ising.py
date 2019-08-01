@@ -18,9 +18,9 @@ class IsingLattice:
         self.kT = kT
         self.critical = bool(self.kT > 2 / np.log(1 + np.sqrt(2)))
         if cold:
-            self.lattice = [[1 for i in range(self.size)] for j in range(self.size)]
+            self.lattice = np.array([[1 for i in range(self.size)] for j in range(self.size)])
         else:
-            self.lattice = [[random.choice((-1, 1)) for i in range(self.size)] for j in range(self.size)]
+            self.lattice = np.array([[random.choice((-1, 1)) for i in range(self.size)] for j in range(self.size)])
 
         self.record_states = []
         self.m = self.cur_magnetization()
@@ -79,9 +79,8 @@ class IsingLattice:
         '''
         rand_y, rand_x = np.random.randint(0, self.size, size=2)
         cluster = [(rand_y, rand_x)]
-        deltaE = 0
 
-        def check_and_add(y, x, y_1, x_1, deltaE):
+        def check_and_add(y, x, y_1, x_1):
             y_1, x_1 = (y_1 % self.size, x_1 % self.size)
             if (y_1, x_1) in cluster:
                 return
@@ -90,18 +89,19 @@ class IsingLattice:
                     cluster.append((y_1, x_1))
 
         for p in cluster:
-            check_and_add(p[0], p[1], p[0] + 1, p[1], deltaE)
-            check_and_add(p[0], p[1], p[0] - 1, p[1], deltaE)
-            check_and_add(p[0], p[1], p[0], p[1] + 1, deltaE)
-            check_and_add(p[0], p[1], p[0], p[1] - 1, deltaE)
+            check_and_add(p[0], p[1], p[0] + 1, p[1])
+            check_and_add(p[0], p[1], p[0] - 1, p[1])
+            check_and_add(p[0], p[1], p[0], p[1] + 1)
+            check_and_add(p[0], p[1], p[0], p[1] - 1)
 
-        for p in cluster:
-            self.lattice[p[0]][p[1]] *= -1
+        self.lattice[np.transpose(cluster)] *= -1
+        self.e = self.energy_periodic()
+        self.m = self.cur_magnetization()
         if im:
             im.set_data(self.lattice)
             return im,
         else:
-            return len(cluster)
+            return len(cluster) / self.size ** 2
 
     def __metropolis_step(self, i=0, im=None, max_iter=5000):
         for j in range(self.size ** 2):
@@ -150,14 +150,13 @@ class IsingLattice:
                         f"{method} is not a supported iteration method. Please choose from 'wolff' or 'metropolis' ")
 
                 if export_every != 0 and i >= delay:
-
                     if int(i / export_every) >= len(self.record_states):
                         # capture snapshot of the image
                         if log_correlation:
                             if len(corrcoeff) > 0:
                                 plt.plot(corrcoeff, label=f"{i}")
                                 corrcoeff = []
-                        self.record_states.append(pickle.loads(pickle.dumps(self.lattice)))
+                        self.record_states.append(self.lattice.tolist())
                 if log_correlation:
                     if len(self.record_states) > 0:
                         a = np.array(self.lattice).flatten()
@@ -168,11 +167,11 @@ class IsingLattice:
                 # Update progress bar and loop progress
                 i += steps
                 pbar.update(steps)
-                sum_e += self.e
-                sum_m += self.m
-                sum_abs_m += abs(self.m)
-                sum_esq += self.e * self.e
-                sum_msq += self.m * self.m
+                sum_e += self.e * steps
+                sum_m += self.m * steps
+                sum_abs_m += abs(self.m) * steps
+                sum_esq += self.e * self.e * steps
+                sum_msq += self.m * self.m * steps
 
         if log_correlation:
             plt.title(f"R^2 correlation at T:{self.kT}")
@@ -180,7 +179,7 @@ class IsingLattice:
             plt.show()
 
         return sum_e / (max_iter), sum_abs_m / max_iter, sum_esq / (max_iter) - (
-                    sum_e / (max_iter)) ** 2, sum_msq / max_iter - (
+                sum_e / (max_iter)) ** 2, sum_msq / max_iter - (
                        sum_m / max_iter) ** 2
 
     def start_animation(self, method='metropolis', max_iter=500000):
@@ -228,16 +227,39 @@ class TestTrainSetGenerator:
             finally:
                 obj.write(file)
 
-    def write(self, fname):
-        with open(fname, 'w') as f:
-            json.dump(self.__images, f)
+    def write(self, fname, batch_size=1):
+        step = len(self.__images) / batch_size
+        for i in range(batch_size):
+            start = i * step
+            end = (i + 1) * step
+            with open(f"batch{i}_{fname}", 'w') as f:
+                json.dump(self.__images[start:end], f)
+
+    @staticmethod
+    def autocorrect(fname):
+        print(f"Attempting autocorrect on file {fname}")
+        f = open(fname, 'r')
+        contents = f.readlines()
+        f.seek(0)
+        try:
+            json.load(f)
+            f.close()
+        except JSONDecodeError as json_err:
+            f.close()
+            error_pos = json_err.pos
+            contents.insert(error_pos, ",")
+            wf = open(fname, 'w')
+            wf.write("".join(contents))
+            wf.close()
+            print(json_err)
+            print("corrected")
 
     def load(self, fname):
-        with open(fname) as f:
+        with open(fname, 'r') as f:
             try:
                 inbound_dict = json.load(f)
             except JSONDecodeError as err:
-                start, stop = max(0, err.pos - 20), min(err.pos + 20,len(err.doc))
+                start, stop = max(0, err.pos - 20), min(err.pos + 20, len(err.doc))
                 snippet = err.doc[start:stop]
                 if err.pos < 20:
                     snippet = '... ' + snippet
@@ -246,6 +268,11 @@ class TestTrainSetGenerator:
                 print(snippet)
                 raise err
             self.__images = inbound_dict
+
+    def load_arr(self, files):
+        for file in files:
+            with open(file, 'r') as f:
+                self.__images.extend(json.load(f))
 
     def clean(self):
         self.__images = [i for i in self.__images if isinstance(i['image'], list)]
@@ -293,9 +320,9 @@ if __name__ == '__main__':
     C_v = []
     chi = []
     for t in kt:
-        print(f"\nIterating at temperature: {t}")
+        print(f"Iterating at temperature: {t}")
         ising = IsingLattice(size, t, t < T_CRIT_ONS)
-        e, m, e_var, m_var = ising.start('metropolis', 100000, 0, 0)
+        e, m, e_var, m_var = ising.start('wolff', 1000, 0, 0)
         # e,m,e_var,m_var = ising.start_animation('metropolis', 1000000)
         ttgen.add(ising.record_states, t, ising.critical)
         M.append(m)
