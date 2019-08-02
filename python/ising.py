@@ -207,8 +207,11 @@ def load_show_image(path):
 
 
 class TestTrainSetGenerator:
-    def __init__(self, test_train_ratio=0.8, size=50):
-        self.__test_train_ratio = test_train_ratio
+    def __init__(self, test_ratio=1, validation_ratio=1, train_ratio=1, size=50):
+        self.__test_ratio = test_ratio
+        self.__val_ratio = validation_ratio
+        self.__train_ratio = train_ratio
+
         self.size = size
         self.__images = []
 
@@ -279,29 +282,45 @@ class TestTrainSetGenerator:
 
     def get_data(self):
         np.random.shuffle(self.__images)
+        # Training samples from 0 -> train_point
+        train_point = self.__train_ratio * len(self.__images) / (
+                self.__train_ratio * self.__test_ratio * self.__val_ratio)
+        # Validaion samples from train_point -> val_point
+        val_point = self.__val_ratio * len(self.__images) / (self.__train_ratio * self.__test_ratio * self.__val_ratio)
+        # Test samples from val_point -> end
 
-        split_at = int(self.__test_train_ratio * len(self.__images))
+        train_data = [t['image'] for t in self.__images[:train_point]]
+        validation_data = [t['image'] for t in self.__images[train_point:val_point]]
+        test_data = [t['image'] for t in self.__images[val_point:]]
 
-        train_data = [t['image'] for t in self.__images[:split_at]]
-        test_data = [t['image'] for t in self.__images[split_at:]]
+        train_label = [t['label'] for t in self.__images[:train_point]]
+        validation_label = [t['label'] for t in self.__images[train_point:val_point]]
+        test_label = [t['label'] for t in self.__images[val_point:]]
 
-        train_label = [t['label'] for t in self.__images[:split_at]]
-        test_label = [t['label'] for t in self.__images[split_at:]]
         return (np.array(train_data, dtype=np.float32), np.array(train_label, dtype=np.int32)), (
-            np.array(test_data, dtype=np.float32), np.array(test_label, dtype=np.int32))
+            np.array(test_data, dtype=np.float32), np.array(test_label, dtype=np.int32)), (
+                   np.array(validation_data, dtype=np.float32), np.array(validation_label, dtype=np.int32))
 
     def get_data_flattened(self):
         np.random.shuffle(self.__images)
+        # Training samples from 0 -> train_point
+        train_point = self.__train_ratio * len(self.__images) / (
+                self.__train_ratio * self.__test_ratio * self.__val_ratio)
+        # Validaion samples from train_point -> val_point
+        val_point = self.__val_ratio * len(self.__images) / (self.__train_ratio * self.__test_ratio * self.__val_ratio)
+        # Test samples from val_point -> end
 
-        split_at = int(self.__test_train_ratio * len(self.__images))
+        train_data = [np.array(t['image']).flatten() for t in self.__images[:train_point]]
+        validation_data = [np.array(t['image']).flatten() for t in self.__images[train_point:val_point]]
+        test_data = [np.array(t['image']).flatten() for t in self.__images[val_point:]]
 
-        train_data = [np.array(t['image']).flatten() for t in self.__images[:split_at]]
-        test_data = [np.array(t['image']).flatten() for t in self.__images[split_at:]]
+        train_label = [t['label'] for t in self.__images[:train_point]]
+        validation_label = [t['label'] for t in self.__images[train_point:val_point]]
+        test_label = [t['label'] for t in self.__images[val_point:]]
 
-        train_label = [t['label'] for t in self.__images[:split_at]]
-        test_label = [t['label'] for t in self.__images[split_at:]]
         return (np.array(train_data, dtype=np.float32), np.array(train_label, dtype=np.int32)), (
-            np.array(test_data, dtype=np.float32), np.array(test_label, dtype=np.int32))
+            np.array(test_data, dtype=np.float32), np.array(test_label, dtype=np.int32)), (
+                   np.array(validation_data, dtype=np.float32), np.array(validation_label, dtype=np.int32))
 
     def add(self, images, temp, critical):
         for image in images:
