@@ -352,3 +352,4 @@ MigrationBackup/
 dumps/
 json_dumps/
 logs/
+c++/output.py
