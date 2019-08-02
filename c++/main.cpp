@@ -27,7 +27,7 @@ std::vector<double> linspace(const double start, const double end, const int n_s
 
 
 void getData(const double start_temp, const double end_temp, const int N_steps, std::string path, int iterations = 1000000,
-	int record_every = 200, int delay = 1000, int fileSize = 10000) {
+	int record_every = 200, int delay = 1000, int fileSize = 4000) {
 	std::vector<double> t = linspace(start_temp, end_temp, N_steps);
 	std::vector<double> e(N_steps);
 	std::vector<double> m(N_steps);
@@ -93,13 +93,21 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 	//p.show();
 
 	// file I/O timew
-
+	std::string tmppath = path;
+	tmppath.insert(0, "batch_" + std::to_string(batch++) + "_");
+	std::ofstream file(tmppath);
+	file << core_json;
+	core_json = json::array();
+	file.close();
+	std::cout << "File:" << tmppath << " successfully written";
 }
 
 int main()
 {
 	double range = 5.0 / (4.0 * 50);
-	getData(2.0, 2.5,4, "twobatch.json",250000,100,1000);
+	getData(T_CRIT - range*2,T_CRIT + range *2,2, "twobatch.json",1000000,1000,1000);
+	getData(T_CRIT - range * 4, T_CRIT + range * 4, 4, "quadbatch.json", 1000000, 1000);
+	getData(2.0, 2.5, 10, "broad_spectrum.json", 500000);
 	return 0;
 }
 
