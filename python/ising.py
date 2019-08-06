@@ -4,7 +4,6 @@ from json import JSONDecodeError
 
 import numpy as np
 import matplotlib.pyplot as plt
-import pickle
 from tqdm import tqdm
 from datetime import datetime as dt
 import os
@@ -72,27 +71,21 @@ class IsingLattice:
 
     def __wolff_step(self, i=0, im=None, max_iter=0):
         '''
-        Work using bonds as opposed to individual spins on the lattice.
-        Converts problem to a percolation problem which unlike Metropolis does not fall in to inf relaxation time at the critical
-        temperature.
-        :return: Artist object to be blitted to matplotlib canvas
+        Work using bonds as opposed to individual spins on the lattice. Converts problem to a percolation problem
+        which unlike Metropolis does not fall in to inf relaxation time at the critical temperature. :return: Artist
+        object to be blitted to matplotlib canvas
         '''
         rand_y, rand_x = np.random.randint(0, self.size, size=2)
         cluster = [(rand_y, rand_x)]
 
-        def check_and_add(y, x, y_1, x_1):
-            y_1, x_1 = (y_1 % self.size, x_1 % self.size)
-            if (y_1, x_1) in cluster:
-                return
-            if self.lattice[y][x] == self.lattice[y_1][x_1]:
-                if random.random() <= (1 - np.exp(-2 / self.kT)):
-                    cluster.append((y_1, x_1))
-
         for p in cluster:
-            check_and_add(p[0], p[1], p[0] + 1, p[1])
-            check_and_add(p[0], p[1], p[0] - 1, p[1])
-            check_and_add(p[0], p[1], p[0], p[1] + 1)
-            check_and_add(p[0], p[1], p[0], p[1] - 1)
+            for p_1 in [(p[0] - 1, p[1] - 1), (p[0] - 1, p[1] + 1), (p[0] + 1, p[1] - 1), (p[0] + 1, p[1] + 1)]:
+                y_1, x_1 = (p_1[0] % self.size, p_1[1] % self.size)
+                if (y_1, x_1) in cluster:
+                    continue
+                if self.lattice[p[0]][p[1]] == self.lattice[y_1][x_1]:
+                    if random.random() <= (1 - np.exp(-2 / self.kT)):
+                        cluster.append((y_1, x_1))
 
         self.lattice[np.transpose(cluster)] *= -1
         self.e = self.energy_periodic()
@@ -283,10 +276,11 @@ class TestTrainSetGenerator:
     def get_data(self):
         np.random.shuffle(self.__images)
         # Training samples from 0 -> train_point
-        train_point = self.__train_ratio * len(self.__images) / (
-                self.__train_ratio * self.__test_ratio * self.__val_ratio)
+        train_point = int(self.__train_ratio * len(self.__images) / (
+                self.__train_ratio + self.__test_ratio + self.__val_ratio))
         # Validaion samples from train_point -> val_point
-        val_point = self.__val_ratio * len(self.__images) / (self.__train_ratio * self.__test_ratio * self.__val_ratio)
+        val_point = int(train_point + self.__val_ratio * len(self.__images) / (
+                    self.__train_ratio + self.__test_ratio + self.__val_ratio))
         # Test samples from val_point -> end
 
         train_data = [t['image'] for t in self.__images[:train_point]]
@@ -304,10 +298,11 @@ class TestTrainSetGenerator:
     def get_data_flattened(self):
         np.random.shuffle(self.__images)
         # Training samples from 0 -> train_point
-        train_point = self.__train_ratio * len(self.__images) / (
-                self.__train_ratio * self.__test_ratio * self.__val_ratio)
+        train_point = int(self.__train_ratio * len(self.__images) / (
+                self.__train_ratio + self.__test_ratio + self.__val_ratio))
         # Validaion samples from train_point -> val_point
-        val_point = self.__val_ratio * len(self.__images) / (self.__train_ratio * self.__test_ratio * self.__val_ratio)
+        val_point = int(
+            self.__val_ratio * len(self.__images) / (self.__train_ratio + self.__test_ratio + self.__val_ratio))
         # Test samples from val_point -> end
 
         train_data = [np.array(t['image']).flatten() for t in self.__images[:train_point]]
@@ -332,7 +327,7 @@ if __name__ == '__main__':
     size = 50
     ttgen = TestTrainSetGenerator(size=size)
     min_res = 10 / (4 * size)
-    kt = np.linspace(2.2, 2.3, 10)
+    kt = np.linspace(T_CRIT_ONS - min_res, T_CRIT_ONS + min_res, 2)
 
     M = []
     E = []
@@ -341,7 +336,7 @@ if __name__ == '__main__':
     for t in kt:
         print(f"Iterating at temperature: {t}")
         ising = IsingLattice(size, t, t < T_CRIT_ONS)
-        e, m, e_var, m_var = ising.start('wolff', 1000, 0, 0)
+        e, m, e_var, m_var = ising.start('wolff', 5000, 0, 0)
         # e,m,e_var,m_var = ising.start_animation('metropolis', 1000000)
         ttgen.add(ising.record_states, t, ising.critical)
         M.append(m)
