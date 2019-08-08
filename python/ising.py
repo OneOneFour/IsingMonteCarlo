@@ -1,7 +1,7 @@
 import json
 import random
 from json import JSONDecodeError
-
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -121,7 +121,8 @@ class IsingLattice:
             return im,
         return 1
 
-    def start(self, method='metropolis', max_iter=5000, export_every=0, delay=0, log_correlation=False):
+    def start(self, method='metropolis', max_iter=5000, export_every=0, delay=0, log_correlation=False,
+              animated_plots=False):
         if log_correlation:
             corrcoeff = []
         if export_every != 0:
@@ -280,7 +281,7 @@ class TestTrainSetGenerator:
                 self.__train_ratio + self.__test_ratio + self.__val_ratio))
         # Validaion samples from train_point -> val_point
         val_point = int(train_point + self.__val_ratio * len(self.__images) / (
-                    self.__train_ratio + self.__test_ratio + self.__val_ratio))
+                self.__train_ratio + self.__test_ratio + self.__val_ratio))
         # Test samples from val_point -> end
 
         train_data = [t['image'] for t in self.__images[:train_point]]
@@ -324,6 +325,7 @@ class TestTrainSetGenerator:
 
 if __name__ == '__main__':
     # np.seterr(all='raise')
+
     size = 50
     ttgen = TestTrainSetGenerator(size=size)
     min_res = 10 / (4 * size)
@@ -333,31 +335,38 @@ if __name__ == '__main__':
     E = []
     C_v = []
     chi = []
-    for t in kt:
-        print(f"Iterating at temperature: {t}")
-        ising = IsingLattice(size, t, t < T_CRIT_ONS)
-        e, m, e_var, m_var = ising.start('wolff', 5000, 0, 0)
-        # e,m,e_var,m_var = ising.start_animation('metropolis', 1000000)
-        ttgen.add(ising.record_states, t, ising.critical)
-        M.append(m)
-        E.append(e)
-        C_v.append(e_var / ((t ** 2) * 2500))
-        chi.append(m_var / t)
-    ttgen.write(f"dumps/{dt.now().strftime('%d-%m-%Y %H-%M-%S')}dump.json")
-    plt.subplot(2, 2, 1)
-    plt.title("Absolute Magnetization per spin")
-    plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
-    plt.plot(kt, M)
-    plt.subplot(2, 2, 2)
-    plt.title("Energy per spin")
-    plt.plot(kt, E)
-    plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
-    plt.subplot(2, 2, 3)
-    plt.title("Heat capacity")
-    plt.plot(kt, C_v)
-    plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
-    plt.subplot(2, 2, 4)
-    plt.title("Susceptibility")
-    plt.plot(kt, chi)
-    plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
-    plt.show()
+
+    if sys.argv[1] == "animate":
+        for t in kt:
+            print(f"Iterating at temperature: {t}")
+            ising = IsingLattice(size, t,False)
+            ising.start_animation("metropolis", 10000)
+    else:
+        for t in kt:
+            print(f"Iterating at temperature: {t}")
+            ising = IsingLattice(size, t, t < T_CRIT_ONS)
+            e, m, e_var, m_var = ising.start('wolff', 5000, 0, 0)
+            # e,m,e_var,m_var = ising.start_animation('metropolis', 1000000)
+            ttgen.add(ising.record_states, t, ising.critical)
+            M.append(m)
+            E.append(e)
+            C_v.append(e_var / ((t ** 2) * 2500))
+            chi.append(m_var / t)
+        ttgen.write(f"dumps/{dt.now().strftime('%d-%m-%Y %H-%M-%S')}dump.json")
+        plt.subplot(2, 2, 1)
+        plt.title("Absolute Magnetization per spin")
+        plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
+        plt.plot(kt, M)
+        plt.subplot(2, 2, 2)
+        plt.title("Energy per spin")
+        plt.plot(kt, E)
+        plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
+        plt.subplot(2, 2, 3)
+        plt.title("Heat capacity")
+        plt.plot(kt, C_v)
+        plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
+        plt.subplot(2, 2, 4)
+        plt.title("Susceptibility")
+        plt.plot(kt, chi)
+        plt.axvline(x=2 / np.log(1 + np.sqrt(2)), color='k', linestyle='--')
+        plt.show()
