@@ -8,11 +8,13 @@
 #include "IsingModel.h"
 #include "C2PyPlot.h"
 
+#define LATTICE_SIZE 50
+
 using json = nlohmann::json;
 
 constexpr auto ARR_LEN = 100;
 const double T_CRIT = 2.0 / log(1.0 + sqrt(2.0));
-
+const double RANGE = 5.0 / (4.0 * LATTICE_SIZE);
 
 // YES I KNOW THIS IS RAM INEFFICENT BLAH BLAH BLAH 
 std::vector<double> linspace(const double start, const double end, const int n_samples = 2) {
@@ -39,7 +41,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 	int batch = 0;
 #pragma omp parallel for
 	for (int i = 0; i < N_steps; i++) {
-		IsingModel model(50, t[i], iterations);
+		IsingModel model(LATTICE_SIZE, t[i], iterations);
 
 		model.start(record_every, delay);
 #pragma omp critical
@@ -96,18 +98,42 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 	std::string tmppath = path;
 	tmppath.insert(0, "batch_" + std::to_string(batch++) + "_");
 	std::ofstream file(tmppath);
-	file << core_json;
-	core_json = json::array();
-	file.close();
+    file.close();
 	std::cout << "File:" << tmppath << " successfully written";
+
+
+	// Write metadatafile
+	json metaJson;
+	metaJson["startTemp"] = start_temp;
+	metaJson["startTempRangeSteps"] = (T_CRIT - start_temp)/RANGE
+	metaJson["endTemp"] = end_temp;
+	metaJson["endTempRangeSteps"] = (end_temp-T_CRIT)/RANGE
+	metaJson["tempSteps"] = N_steps;
+	metaJson["files"] = json::array();
+    for(int i =0; i < batch; i++){
+        metaJson["files"].push_back("batch_"+std::to_string(i)+path);
+    }
+    metaJson["iterations"] = iterations;
+    metaJson["record_every"] = record_every;
+    metaJson["delay"] = delay;
+    metaJson["lattice_size"] = LATTICE_SIZE;
+    metaJson["energy"] = e;
+    metaJson["magnetization"] = m;
+    metaJson["susceptibility"] = chi;
+    metaJson["heat_capacity"] = cv;
+	std::string metapath = "meta_"+ path;
+	std::ofstream metafile(metapath);
+    metafile << metaJson;
+    file.close();
+    std::cout << "File:" << tmppath << " successfully written";
+
 }
 
 int main()
 {
-	double range = 5.0 / (4.0 * 50);
-	getData(T_CRIT - range*2,T_CRIT + range *2,2, "twobatch.json",1000000,1000,1000);
-	getData(T_CRIT - range * 4, T_CRIT + range * 4, 4, "quadbatch.json", 1000000, 1000);
-	getData(2.0, 2.5, 10, "broad_spectrum.json", 500000);
+
+	getData(T_CRIT - RANGE,T_CRIT + RANGE,2, "atcrit06082019.json",5000000,1000,1000);
+	getData(T_CRIT - RANGE, T_CRIT +RANGE, 4, "probingcritical.json", 2500000,1000,1500);
 	return 0;
 }
 

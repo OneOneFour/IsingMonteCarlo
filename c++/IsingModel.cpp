@@ -1,6 +1,6 @@
 #include "IsingModel.h"
-
-
+#include <chrono>
+#include <iostream>
 IsingModel::IsingModel(int size, double t,int iterations) :rng{ rd() }, uni(0.0, size-1), r(0.0, 1.0), e(0),
 															m(0), sum_esq(0), sum_msq(0),iterations(iterations),
 															sum_m(0),sum_e(0),abs_m(0)
@@ -56,6 +56,7 @@ void IsingModel::start(int sample_every, int delay) {
 		this->abs_m += abs(this->m);
 	}
 }
+
 
 std::string get_json_str(bool* arr, int size, bool supercrit,double t) {
 	std::string str = "{\"label\":";
@@ -130,12 +131,13 @@ int IsingModel::metropolis_step(int i ) {
 		double p = exp(-(double)deltaE / this->t);
 		double r = this->r(this->rng);
 		if (deltaE <= 0 || r <= p) {
-			this->flip_site(randX, randY);
 
-			double dm = (2.0 * (double)this->get_site(randX, randY));
+				this->flip_site(randX, randY);
 
-			this->e += deltaE;
-			this->m += dm;
+				double dm = (2.0 * (double)this->get_site(randX, randY));
+
+				this->e += deltaE;
+				this->m += dm;
 
 		}
 	}
