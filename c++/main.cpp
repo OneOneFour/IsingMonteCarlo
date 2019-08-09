@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <stack>
+#include <filesystem>
 #include <nlohmann/json.hpp>
 #include "IsingModel.h"
 #include "C2PyPlot.h"
@@ -105,9 +106,9 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 	// Write metadatafile
 	json metaJson;
 	metaJson["startTemp"] = start_temp;
-	metaJson["startTempRangeSteps"] = (T_CRIT - start_temp)/RANGE
+	metaJson["startTempRangeSteps"] = (T_CRIT - start_temp) / RANGE;
 	metaJson["endTemp"] = end_temp;
-	metaJson["endTempRangeSteps"] = (end_temp-T_CRIT)/RANGE
+	metaJson["endTempRangeSteps"] = (end_temp - T_CRIT) / RANGE;
 	metaJson["tempSteps"] = N_steps;
 	metaJson["files"] = json::array();
     for(int i =0; i < batch; i++){
@@ -131,9 +132,73 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 
 int main()
 {
+	// Begin work on some sort of user interface
+	std::vector<json> batched_jobs;
+	while (true) {
+		json job;
+		double startT, endT;
+		int N_samples, iterations, record_every, delay;
+		std::string path, response;
+		do {
+			response = "";
+			std::cout << "Do you want to use absolute temperatures or those relative to critical point? (abs/rel)";
+			std::cin >> response;
+		} while (response != "abs" || response != "rel");
+		if (response == "abs") {
+			std::cout << "Enter starting temperature";
+			std::cin >> startT;
 
-	getData(T_CRIT - RANGE,T_CRIT + RANGE,2, "atcrit06082019.json",5000000,1000,1000);
-	getData(T_CRIT - RANGE, T_CRIT +RANGE, 4, "probingcritical.json", 2500000,1000,1500);
+			std::cout << "Enter end temperature";
+			std::cin >> endT;
+		}
+		else {
+			std::cout << "Enter starting temperature in units of \"range\" away from the critical temperature" <<
+				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?";
+			int tSteps; std::cin >> tSteps;
+			startT = T_CRIT - RANGE * tSteps;
+
+			std::cout << "Enter final temperature in units of \"range\" away from the critical temperature" <<
+				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?";
+			std::cin >> tSteps;
+			endT = T_CRIT + RANGE * tSteps;
+		}
+		std::cout << "Enter the number of steps between the temperatures:";
+		std::cin >> N_samples;
+
+		std::cout << "Enter the number of Monte Carlo iterations to run each step for";
+		std::cin >> iterations;
+
+		std::cout << "Enter the frequency with which to capture samples";
+		std::cin >> record_every;
+		
+		std::cout << "Enter the amount of Monte Carlo time to wait until capturing samples";
+		std::cin >> delay;
+
+		std::cout << "Enter the path to save files";
+		std::cin >> path;
+
+		std::cout << "Enter a name/description for this job (optional)";
+		std::string desc; std::cin >> desc;
+
+		std::cout << "Do you wish to add another batched job?(Y/N)";
+		std::string resp; std::cin >> resp;
+
+
+		job["startT"] = startT;
+		job["endT"] = endT;
+		job["N_samples"] = N_samples;
+		job["iteartions"] = iterations;
+		job["record_every"] = record_every;
+		job["delay"] = delay;
+		job["path"] = path;
+		job["name"] = desc;
+		batched_jobs.push_back(job);
+		if (resp == "N") break;				
+	}
+	for (json& job :batched_jobs) {
+		std::cout << "Executing job: " << job['desc'] << std::endl;
+		getData(job["startT"], job["endT"], job["N_samples"], job["path"], job["iterations"], job["record_every"], job["delay"]);
+	}
 	return 0;
 }
 
