@@ -1,13 +1,30 @@
 import numpy as np
-from tensorflow.python.keras import layers, models, regularizers, callbacks
+import ast
+from tensorflow.keras import layers, models, regularizers, callbacks
 import matplotlib.pyplot as plt
 from ising import TestTrainSetGenerator
-from tensorflow.python.keras.callbacks import TensorBoard
+import neptune_tensorboard as neptune_tb
 from time import time
 import neptune
 from datetime import datetime
 
 file = "../c++/batch_0_twobatch.json"
+files = [
+    "../c++/batch_0_atcrit06082019.json",
+    "../c++/batch_1_atcrit06082019.json",
+    "../c++/batch_2_atcrit06082019.json"
+]
+
+PARAMS = {
+    "optimizer": "adam",
+    "loss": "binary_crossentropy",
+    "epochs": 20,
+    "metrics": ["accuracy"],
+    "batch_size": 64,
+    "l2_regularization_weight": 0.01,
+    "layer_dropout": 0.3,
+
+}
 
 
 class NeptuneCallback(callbacks.Callback):
@@ -80,43 +97,51 @@ def perceptron_test(training_data, training_labels, validation_data, validation_
     return model, hist_dict
 
 
-def feed_forward(training_data, training_labels, validation_data, validation_labels, epochs,neptunecallback):
-    tensorboard = TensorBoard(log_dir=f"logs\{time()}", )
+def feed_forward(training_data, training_labels, validation_data, validation_labels, callback, exp):
     model = models.Sequential()
     model.add(layers.Flatten(input_shape=(50, 50,)))
-    model.add(layers.Dense(512, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
-    model.add(layers.Dense(256, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
-    model.add(layers.Dense(256, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
-    model.add(layers.Dropout(0.3))
+    model.add(layers.Dense(512, activation='relu',
+                           kernel_regularizer=regularizers.l2(exp.get_parameters()['l2_regularization_weight'])))
+    model.add(layers.Dense(256, activation='relu',
+                           kernel_regularizer=regularizers.l2(exp.get_parameters()['l2_regularization_weight'])))
+    model.add(layers.Dense(256, activation='relu',
+                           kernel_regularizer=regularizers.l2(exp.get_parameters()["l2_regularization_weight"])))
+    model.add(layers.Dropout(exp.get_parameters()['layer_dropout']))
     model.add(layers.Dense(1, activation='sigmoid'))
-    model.compile(optimizer="adam", loss="binary_crossentropy", metrics=['accuracy'])
-    history = model.fit(training_data, training_labels, epochs=epochs, batch_size=64,
+    model.compile(optimizer=PARAMS['optimizer'], loss=PARAMS['loss'], metrics=ast.literal_eval(PARAMS['metrics']))
+    history = model.fit(training_data, training_labels, epochs=PARAMS['epochs'], batch_size=PARAMS['batch_size'],
                         validation_data=(validation_data, validation_labels),
-                        callbacks=[tensorboard,neptunecallback])
+                        callbacks=[callback])
     hist_dict = history.history
-    plot_train_val_loss(hist_dict, epochs)
-    plot_train_val_acc(hist_dict, epochs)
+    plot_train_val_loss(hist_dict, PARAMS['epochs'])
+    plot_train_val_acc(hist_dict, PARAMS['epochs'])
 
     return model, hist_dict
 
 
 if __name__ == '__main__':
     neptune.init("OneOneFour/Ising-Model")
-    with neptune.create_experiment(name="Feed Forward Network ") as exp:
+    neptune_tb.integrate_with_tensorflow()
+    with neptune.create_experiment(name="Feed Forward Network", params=PARAMS) as exp:
         ttsg = TestTrainSetGenerator(train_ratio=5)
-        ttsg.load(file)
+        if file:
+            ttsg.load(file)
+        elif files:
+            ttsg.load_arr(files)
         (train_images, train_labels), (test_images, test_labels), (val_image, val_data) = ttsg.get_data()
 
         train_images = (train_images + 1) / 2
         test_images = (test_images + 1) / 2
         val_image = (val_image + 1) / 2
         plot_9_sample(test_images, test_labels)
-        neptunecallback = NeptuneCallback(exp)
-        model, hist_dict = feed_forward(train_images, train_labels, val_image, val_data, 100,neptunecallback)
+        callback = callbacks.TensorBoard(log_dir=f"logs\\ffn\\{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+        model, hist_dict = feed_forward(train_images, train_labels, val_image, val_data, callback, exp)
 
         loss, acc = model.evaluate(test_images, test_labels)
         print(f"Model Accuracy on test set:{acc}")
-
+        exp.send_text("test-accuracy", acc)
+        exp.send_text("test-loss", loss)
+        exp.send_text("file-name", file)
         name = f"FFN_weights {datetime.now().strftime('%Y_%m_%d %H_%M')}.h5"
         model.save_weights(name)
         exp.send_artifact(name)
