@@ -31,6 +31,7 @@ std::vector<double> linspace(const double start, const double end, const int n_s
 
 void getData(const double start_temp, const double end_temp, const int N_steps, std::string path, int iterations = 1000000,
 	int record_every = 200, int delay = 1000, int fileSize = 4000) {
+	path += ".json";
 	std::vector<double> t = linspace(start_temp, end_temp, N_steps);
 	std::vector<double> e(N_steps);
 	std::vector<double> m(N_steps);
@@ -134,6 +135,7 @@ int main()
 {
 	// Begin work on some sort of user interface
 	std::vector<json> batched_jobs;
+	
 	while (true) {
 		json job;
 		double startT, endT;
@@ -141,53 +143,53 @@ int main()
 		std::string path, response;
 		do {
 			response = "";
-			std::cout << "Do you want to use absolute temperatures or those relative to critical point? (abs/rel)";
+			std::cout << "Do you want to use absolute temperatures or those relative to critical point? (abs/rel)	";
 			std::cin >> response;
-		} while (response != "abs" || response != "rel");
+		} while (response != "abs" && response != "rel");
 		if (response == "abs") {
-			std::cout << "Enter starting temperature";
+			std::cout << "Enter starting temperature:	";
 			std::cin >> startT;
 
-			std::cout << "Enter end temperature";
+			std::cout << "Enter end temperature:	";
 			std::cin >> endT;
 		}
 		else {
 			std::cout << "Enter starting temperature in units of \"range\" away from the critical temperature" <<
-				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?";
+				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?	";
 			int tSteps; std::cin >> tSteps;
 			startT = T_CRIT - RANGE * tSteps;
 
 			std::cout << "Enter final temperature in units of \"range\" away from the critical temperature" <<
-				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?";
+				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?	";
 			std::cin >> tSteps;
 			endT = T_CRIT + RANGE * tSteps;
 		}
-		std::cout << "Enter the number of steps between the temperatures:";
+		std::cout << "Enter the number of steps between the temperatures:	";
 		std::cin >> N_samples;
 
-		std::cout << "Enter the number of Monte Carlo iterations to run each step for";
+		std::cout << "Enter the number of Monte Carlo iterations to run each step for:	";
 		std::cin >> iterations;
 
-		std::cout << "Enter the frequency with which to capture samples";
+		std::cout << "Enter the frequency with which to capture samples:	";
 		std::cin >> record_every;
 		
-		std::cout << "Enter the amount of Monte Carlo time to wait until capturing samples";
+		std::cout << "Enter the amount of Monte Carlo time to wait until capturing samples:	";
 		std::cin >> delay;
 
-		std::cout << "Enter the path to save files";
-		std::cin >> path;
-
-		std::cout << "Enter a name/description for this job (optional)";
-		std::string desc; std::cin >> desc;
-
-		std::cout << "Do you wish to add another batched job?(Y/N)";
+		std::cout << "Enter the path to save files:	";
+		std::getline(std::cin, path);
+		std::cout << "Enter a name/description for this job (optional):	";
+		std::cin.ignore();
+		std::string desc;
+		std::getline(std::cin, desc);
+		std::cout << "Do you wish to add another batched job?(Y/N)	";
 		std::string resp; std::cin >> resp;
 
 
 		job["startT"] = startT;
 		job["endT"] = endT;
 		job["N_samples"] = N_samples;
-		job["iteartions"] = iterations;
+		job["iterations"] = iterations;
 		job["record_every"] = record_every;
 		job["delay"] = delay;
 		job["path"] = path;
@@ -196,7 +198,8 @@ int main()
 		if (resp == "N") break;				
 	}
 	for (json& job :batched_jobs) {
-		std::cout << "Executing job: " << job['desc'] << std::endl;
+		std::cout << "Executing job: " << job["name"] << std::endl;
+		std::experimental::filesystem::create_directory(job["path"]);
 		getData(job["startT"], job["endT"], job["N_samples"], job["path"], job["iterations"], job["record_every"], job["delay"]);
 	}
 	return 0;
