@@ -6,6 +6,9 @@
 #include <stack>
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#if defined(_WIN64)
+#include <Windows.h>
+#endif
 #include "IsingModel.h"
 #include "C2PyPlot.h"
 
@@ -100,6 +103,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 	std::string tmppath = path;
 	tmppath.insert(0, "batch_" + std::to_string(batch++) + "_");
 	std::ofstream file(tmppath);
+	file << core_json; // lol should probably write the file!
     file.close();
 	std::cout << "File:" << tmppath << " successfully written";
 
@@ -143,46 +147,47 @@ int main()
 		std::string path, response;
 		do {
 			response = "";
-			std::cout << "Do you want to use absolute temperatures or those relative to critical point? (abs/rel)	";
+			std::cout << "Do you want to use absolute temperatures or those relative to critical point? (abs/rel)  ";
 			std::cin >> response;
 		} while (response != "abs" && response != "rel");
 		if (response == "abs") {
-			std::cout << "Enter starting temperature:	";
+			std::cout << "Enter starting temperature:  ";
 			std::cin >> startT;
 
-			std::cout << "Enter end temperature:	";
+			std::cout << "Enter end temperature:  ";
 			std::cin >> endT;
 		}
 		else {
 			std::cout << "Enter starting temperature in units of \"range\" away from the critical temperature" <<
-				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?	";
+				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?  ";
 			int tSteps; std::cin >> tSteps;
 			startT = T_CRIT - RANGE * tSteps;
 
 			std::cout << "Enter final temperature in units of \"range\" away from the critical temperature" <<
-				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?	";
+				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?  ";
 			std::cin >> tSteps;
 			endT = T_CRIT + RANGE * tSteps;
 		}
-		std::cout << "Enter the number of steps between the temperatures:	";
+		std::cout << "Enter the number of steps between the temperatures:  ";
 		std::cin >> N_samples;
 
-		std::cout << "Enter the number of Monte Carlo iterations to run each step for:	";
+		std::cout << "Enter the number of Monte Carlo iterations to run each step for:  ";
 		std::cin >> iterations;
 
-		std::cout << "Enter the frequency with which to capture samples:	";
+		std::cout << "Enter the frequency with which to capture samples:  ";
 		std::cin >> record_every;
 		
-		std::cout << "Enter the amount of Monte Carlo time to wait until capturing samples:	";
+		std::cout << "Enter the amount of Monte Carlo time to wait until capturing samples:  ";
 		std::cin >> delay;
-
+		std::cin.ignore();
 		std::cout << "Enter the path to save files:	";
 		std::getline(std::cin, path);
-		std::cout << "Enter a name/description for this job (optional):	";
-		std::cin.ignore();
+		std::filesystem::create_directory(path);
+
+		std::cout << "Enter a name/description for this job (optional):  ";
 		std::string desc;
 		std::getline(std::cin, desc);
-		std::cout << "Do you wish to add another batched job?(Y/N)	";
+		std::cout << "Do you wish to add another batched job?(Y/N)  ";
 		std::string resp; std::cin >> resp;
 
 
@@ -199,8 +204,14 @@ int main()
 	}
 	for (json& job :batched_jobs) {
 		std::cout << "Executing job: " << job["name"] << std::endl;
-		std::experimental::filesystem::create_directory(job["path"]);
-		getData(job["startT"], job["endT"], job["N_samples"], job["path"], job["iterations"], job["record_every"], job["delay"]);
+		std::string path = job["path"];
+
+		if (SetCurrentDirectory(path.c_str()) != 0 ) {
+			getData(job["startT"], job["endT"], job["N_samples"], job["path"], job["iterations"], job["record_every"], job["delay"]);
+		}
+		else {
+			std::cout << "something bad happened when changing working directory" << std::endl;
+		}
 	}
 	return 0;
 }
