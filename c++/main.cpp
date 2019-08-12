@@ -139,7 +139,9 @@ int main()
 {
 	// Begin work on some sort of user interface
 	std::vector<json> batched_jobs;
-	
+	int bufferSize = GetCurrentDirectory(0, NULL);
+	char* strBuffer = new char[bufferSize];
+	GetCurrentDirectory(bufferSize, strBuffer);
 	while (true) {
 		json job;
 		double startT, endT;
@@ -202,11 +204,13 @@ int main()
 		batched_jobs.push_back(job);
 		if (resp == "N") break;				
 	}
+	
 	for (json& job :batched_jobs) {
 		std::cout << "Executing job: " << job["name"] << std::endl;
-		std::string path = job["path"];
-
-		if (SetCurrentDirectory(path.c_str()) != 0 ) {
+		std::string ppd = job["path"];
+		ppd.insert(0, "\\");
+		std::string path = strBuffer + ppd;
+		if (SetCurrentDirectory((path).c_str()) != 0 ) {
 			getData(job["startT"], job["endT"], job["N_samples"], job["path"], job["iterations"], job["record_every"], job["delay"]);
 		}
 		else {
