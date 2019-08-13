@@ -60,10 +60,10 @@ void getData(const double start_temp, const double end_temp,int lattice_size, co
 			cv[i] = model.get_e_variance() / (t[i] * t[i]);
 			bool supercrit = t[i] >= 2.0 / log(1.0 + sqrt(2.0));
 			for (bool* arr : model.record_states) {
-				std::vector<std::vector<int>> shapedArr(50);
-				for (int j = 0, l = 0; j < 50; j++) {
-					shapedArr[j].resize(50);
-					for (int k = 0; k < 50; k++, l++) {
+				std::vector<std::vector<int>> shapedArr(lattice_size);
+				for (int j = 0, l = 0; j < lattice_size; j++) {
+					shapedArr[j].resize(lattice_size);
+					for (int k = 0; k < lattice_size; k++, l++) {
 						shapedArr[j][k] = arr[l] * 2- 1;
 					}
 				}
@@ -86,15 +86,6 @@ void getData(const double start_temp, const double end_temp,int lattice_size, co
 
 
 	}
-	//p.plot('t', 'e', &t, &e, "Energy");
-	//p.show();
-
-	//p.plot('t', 'm', &t, &m, "Magnetization");
-	//p.show();
-	//p.plot('t', 'x', &t, &chi, "Succetibility");
-	//p.show();
-	//p.plot('t', 'c', &t, &cv, "Heat Capacity");
-	//p.show();
 
 	// file I/O timew
 	std::string tmppath = path;
