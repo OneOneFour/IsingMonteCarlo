@@ -82,7 +82,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 					file << core_json;
 					core_json = json::array();
 					file.close();
-					std::cout << "File:" << tmppath << " successfully written";
+					std::cout << "File:" << tmppath << " successfully written"<<std::endl;
 				}
 			}
 		}
@@ -105,7 +105,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 	std::ofstream file(tmppath);
 	file << core_json; // lol should probably write the file!
     file.close();
-	std::cout << "File:" << tmppath << " successfully written";
+	std::cout << "File:" << tmppath << " successfully written"<<std::endl;
 
 
 	// Write metadatafile
@@ -117,7 +117,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 	metaJson["tempSteps"] = N_steps;
 	metaJson["files"] = json::array();
     for(int i =0; i < batch; i++){
-        metaJson["files"].push_back("batch_"+std::to_string(i)+path);
+        metaJson["files"].push_back("batch_"+std::to_string(i)+"_"+path);
     }
     metaJson["iterations"] = iterations;
     metaJson["record_every"] = record_every;

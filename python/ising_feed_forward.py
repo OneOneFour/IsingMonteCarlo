@@ -2,23 +2,18 @@ import numpy as np
 import ast
 from tensorflow.keras import layers, models, regularizers, callbacks
 import matplotlib.pyplot as plt
-from ising import TestTrainSetGenerator
+from ising import IsingData
 import neptune_tensorboard as neptune_tb
 from time import time
 import neptune
 from datetime import datetime
 
-file = "../c++/batch_0_twobatch.json"
-files = [
-    "../c++/batch_0_atcrit06082019.json",
-    "../c++/batch_1_atcrit06082019.json",
-    "../c++/batch_2_atcrit06082019.json"
-]
+jFile = "../c++/veryclose4stepsatcrit/meta_veryclose4stepsatcrit.json"
 
 PARAMS = {
     "optimizer": "adam",
     "loss": "binary_crossentropy",
-    "epochs": 20,
+    "epochs": 50,
     "metrics": ["accuracy"],
     "batch_size": 64,
     "l2_regularization_weight": 0.01,
@@ -106,9 +101,11 @@ def feed_forward(training_data, training_labels, validation_data, validation_lab
                            kernel_regularizer=regularizers.l2(exp.get_parameters()['l2_regularization_weight'])))
     model.add(layers.Dense(256, activation='relu',
                            kernel_regularizer=regularizers.l2(exp.get_parameters()["l2_regularization_weight"])))
+    model.add(layers.Dense(128,activation='relu'))
+    model.add(layers.Dense(128, activation='relu'))
     model.add(layers.Dropout(exp.get_parameters()['layer_dropout']))
     model.add(layers.Dense(1, activation='sigmoid'))
-    model.compile(optimizer=PARAMS['optimizer'], loss=PARAMS['loss'], metrics=ast.literal_eval(PARAMS['metrics']))
+    model.compile(optimizer=PARAMS['optimizer'], loss=PARAMS['loss'], metrics=PARAMS['metrics'])
     history = model.fit(training_data, training_labels, epochs=PARAMS['epochs'], batch_size=PARAMS['batch_size'],
                         validation_data=(validation_data, validation_labels),
                         callbacks=[callback])
@@ -123,11 +120,9 @@ if __name__ == '__main__':
     neptune.init("OneOneFour/Ising-Model")
     neptune_tb.integrate_with_tensorflow()
     with neptune.create_experiment(name="Feed Forward Network", params=PARAMS) as exp:
-        ttsg = TestTrainSetGenerator(train_ratio=5)
-        if file:
-            ttsg.load(file)
-        elif files:
-            ttsg.load_arr(files)
+        ttsg = IsingData(train_ratio=5)
+        ttsg.load_json(jFile)
+        ttsg.plot_energy_spectrum()
         (train_images, train_labels), (test_images, test_labels), (val_image, val_data) = ttsg.get_data()
 
         train_images = (train_images + 1) / 2
@@ -139,9 +134,9 @@ if __name__ == '__main__':
 
         loss, acc = model.evaluate(test_images, test_labels)
         print(f"Model Accuracy on test set:{acc}")
-        exp.send_text("test-accuracy", acc)
-        exp.send_text("test-loss", loss)
-        exp.send_text("file-name", file)
+        exp.send_text("test-accuracy", str(acc))
+        exp.send_text("test-loss", str(loss))
+        exp.send_text("file-name", jFile)
         name = f"FFN_weights {datetime.now().strftime('%Y_%m_%d %H_%M')}.h5"
         model.save_weights(name)
         exp.send_artifact(name)

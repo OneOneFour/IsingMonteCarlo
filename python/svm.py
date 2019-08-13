@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
 from sklearn import metrics
-from ising import TestTrainSetGenerator
+from ising import IsingData
 
 data_dict = {
     -1: np.array([[1, 7],
@@ -48,7 +48,7 @@ data_dict = {
 #         return classification
 
 if __name__ == '__main__':
-    ttf = TestTrainSetGenerator(size=50)
+    ttf = IsingData(size=50)
     ttf.load("../dumps/dump_testT00-1(old).json")
     (train_data, train_labels),(test_data, test_labels) = ttf.get_data_flattened()
     svm = SVC(kernel="linear")

@@ -22,30 +22,32 @@ class IsingLattice:
             self.lattice = np.array([[random.choice((-1, 1)) for i in range(self.size)] for j in range(self.size)])
 
         self.record_states = []
-        self.m = self.cur_magnetization()
-        self.e = self.energy_periodic()
+        self.m = self.cur_magnetization(self.lattice, self.size)
+        self.e = self.energy_periodic(self.lattice, self.size)
 
-    def energy_periodic(self):
+    @staticmethod
+    def energy_periodic(lattice, size):
         E = 0
-        for y in range(len(self.lattice)):
-            for x in range(len(self.lattice[y])):
-                E += -1 * self.lattice[y][x] * (
-                        self.lattice[(y + 1) % self.size][x] +
-                        self.lattice[(y - 1) % self.size][x] +
-                        self.lattice[y][(x + 1) % self.size] +
-                        self.lattice[y][(x - 1) % self.size]
+        for y in range(len(lattice)):
+            for x in range(len(lattice[y])):
+                E += -1 * lattice[y][x] * (
+                        lattice[(y + 1) % size][x] +
+                        lattice[(y - 1) % size][x] +
+                        lattice[y][(x + 1) % size] +
+                        lattice[y][(x - 1) % size]
                 )
         return E
 
-    def energy_free_ends(self):
+    @staticmethod
+    def energy_free_ends(lattice, size):
         E = 0
-        for y in range(len(self.lattice)):
-            for x in range(len(self.lattice[y])):  # Use nearest neighbouring 4 cells
-                E += self.lattice[y][x] * (
-                        (self.lattice[y + 1][x] if self.lattice[y + 1][x] < self.size else 0) +
-                        (self.lattice[y - 1][x] if self.lattice[y - 1][x] >= 0 else 0) +
-                        (self.lattice[y][x + 1] if self.lattice[y + 1][x] < self.size else 0) +
-                        (self.lattice[y][x - 1] if self.lattice[y + 1][x] >= 0 else 0)
+        for y in range(len(lattice)):
+            for x in range(len(lattice[y])):  # Use nearest neighbouring 4 cells
+                E += lattice[y][x] * (
+                        (lattice[y + 1][x] if lattice[y + 1][x] < size else 0) +
+                        (lattice[y - 1][x] if lattice[y - 1][x] >= 0 else 0) +
+                        (lattice[y][x + 1] if lattice[y + 1][x] < size else 0) +
+                        (lattice[y][x - 1] if lattice[y + 1][x] >= 0 else 0)
                 )
         return E
 
@@ -54,12 +56,13 @@ class IsingLattice:
         ax.imshow(self.lattice, cmap='jet')
         plt.show()
 
-    def cur_magnetization(self):
+    @staticmethod
+    def cur_magnetization(lattice, size):
         magnetization = 0
-        for row in self.lattice:
+        for row in lattice:
             for spin in row:
                 magnetization += spin
-        return magnetization / (self.size ** 2)
+        return magnetization / (size ** 2)
 
     def abs_cur_magnetization(self):
         magnetization = 0
@@ -88,8 +91,8 @@ class IsingLattice:
                         cluster.append((y_1, x_1))
 
         self.lattice[np.transpose(cluster)] *= -1
-        self.e = self.energy_periodic()
-        self.m = self.cur_magnetization()
+        self.e = self.energy_periodic(self.lattice, self.size)
+        self.m = self.cur_magnetization(self.lattice, self.size)
         if im:
             im.set_data(self.lattice)
             return im,
@@ -200,7 +203,7 @@ def load_show_image(path):
             plt.show()
 
 
-class TestTrainSetGenerator:
+class IsingData:
     def __init__(self, test_ratio=1, validation_ratio=1, train_ratio=1, size=50):
         self.__test_ratio = test_ratio
         self.__val_ratio = validation_ratio
@@ -214,7 +217,7 @@ class TestTrainSetGenerator:
         import glob
         os.chdir(dir)
         for file in glob.iglob('*.json'):
-            obj = TestTrainSetGenerator()
+            obj = IsingData()
             try:
                 with open(file, 'r') as f:
                     obj.__dict__ = json.load(f)
@@ -250,6 +253,19 @@ class TestTrainSetGenerator:
             wf.close()
             print(json_err)
             print("corrected")
+
+    def load_json(self, json_f):
+        import os
+        with open(json_f, 'r') as meta_j:
+            meta_json = json.load(meta_j)
+            head, tail = os.path.split(json_f)
+            os.chdir(head)
+            if 'files' in meta_json:
+                for f in meta_json['files']:
+                    with open(f, 'r') as f:
+                        self.__images.extend(json.load(f))
+            else:
+                raise ValueError("No files to run!")
 
     def load(self, fname):
         with open(fname, 'r') as f:
@@ -296,6 +312,21 @@ class TestTrainSetGenerator:
             np.array(test_data, dtype=np.float32), np.array(test_label, dtype=np.int32)), (
                    np.array(validation_data, dtype=np.float32), np.array(validation_label, dtype=np.int32))
 
+    def plot_energy_spectrum(self, bins=10):
+        if len(self.__images) == 0:
+            raise ValueError("Please load images first! Call load,load_arr or load_json")
+        # Sort by temperature
+
+        temperatures = []
+        for t in self.__images:
+            if t['temp'] not in temperatures:
+                temperatures.append(t['temp'])
+        for temp in temperatures:
+            energies = [IsingLattice.energy_periodic(t['image'], 50) for t in self.__images if t['temp'] == temp]
+            plt.hist(energies, bins=bins, label=temp)
+        plt.legend()
+        plt.show()
+
     def get_data_flattened(self):
         np.random.shuffle(self.__images)
         # Training samples from 0 -> train_point
@@ -327,7 +358,7 @@ if __name__ == '__main__':
     # np.seterr(all='raise')
 
     size = 50
-    ttgen = TestTrainSetGenerator(size=size)
+    ttgen = IsingData(size=size)
     min_res = 10 / (4 * size)
     kt = np.linspace(T_CRIT_ONS - min_res, T_CRIT_ONS + min_res, 2)
 
@@ -339,7 +370,7 @@ if __name__ == '__main__':
     if sys.argv[1] == "animate":
         for t in kt:
             print(f"Iterating at temperature: {t}")
-            ising = IsingLattice(size, t,False)
+            ising = IsingLattice(size, t, False)
             ising.start_animation("metropolis", 10000)
     else:
         for t in kt:

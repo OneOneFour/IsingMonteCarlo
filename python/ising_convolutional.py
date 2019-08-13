@@ -5,7 +5,7 @@ from ising_feed_forward import plot_9_sample, plot_with_prediction, plot_train_v
 from tensorflow.python.keras import models, layers
 from tensorflow.keras.callbacks import TensorBoard  # HAVE TO USE THIS NOT THE PYTHON ONE
 import tensorflow as tf
-from ising import TestTrainSetGenerator
+from ising import IsingData
 import neptune_tensorboard as neptune_tb
 import neptune
 from datetime import datetime
@@ -70,7 +70,7 @@ if __name__ == '__main__':
     if sys.argv[1] == "neptune":
         neptune.init(project_qualified_name="OneOneFour/Ising-Model")
         neptune_tb.integrate_with_tensorflow()
-        ttf = TestTrainSetGenerator(train_ratio=1, test_ratio=0.5, validation_ratio=0.20)
+        ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.20)
         if file:
             ttf.load(file)
         elif files:
@@ -108,7 +108,7 @@ if __name__ == '__main__':
             model.save_weights(weights_name)
             exp.send_artifact(weights_name)
     else:
-        ttf = TestTrainSetGenerator(train_ratio=1, test_ratio=0.5, validation_ratio=0.5)
+        ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.5)
         if file:
             ttf.load(file)
         elif files:

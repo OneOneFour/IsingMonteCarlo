@@ -1,7 +1,7 @@
 import tensorflow as tf
 from matplotlib import pyplot as plt
 import numpy as np
-from ising import TestTrainSetGenerator
+from ising import IsingData
 from datetime import datetime as dt
 import neptune
 
@@ -26,7 +26,7 @@ def plot_image_with_nn(image, label, prediction):
 
 
 if __name__ == '__main__':
-    ttfing = TestTrainSetGenerator(0.9,100)
+    ttfing = IsingData(0.9, 100)
     ttfing.load(f"dumps/18-07-2019 15-29-58dump.json")
 
     neptune.init(api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5tbCIsImFwaV9rZXkiOiJhNzRhMWY2Ni03YThiLTRmMWUtODlhNC0wMTFhZTYxNzY4YjYifQ==',
@@ -73,7 +73,7 @@ if __name__ == '__main__':
     for i, img in enumerate(test_images[:10]):
         plot_image_with_nn(img, test_labels[i], predict[i])
 
-    harder_test = TestTrainSetGenerator()
+    harder_test = IsingData()
     harder_test.load(f"dump_testT00-1(old).json")
     (train_images_h, train_labels_h), (test_images_h, test_labels_h) = harder_test.get_data()
     train_images_h = (train_images_h + 1) / 2
