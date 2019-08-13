@@ -108,6 +108,7 @@ void getData(const double start_temp, const double end_temp,int lattice_size, co
 	// Write metadatafile
 	json metaJson;
 	metaJson["startTemp"] = start_temp;
+	int RANGE = 5.0 / (4.0 * lattice_size);
 	metaJson["startTempRangeSteps"] = (T_CRIT - start_temp) / RANGE;
 	metaJson["endTemp"] = end_temp;
 	metaJson["endTempRangeSteps"] = (end_temp - T_CRIT) / RANGE;
@@ -162,12 +163,12 @@ int main()
 		else if(response == "rel_range"){
 			double RANGE = 5.0 / (4.0 * lattice_size);
 			std::cout << "Enter starting temperature in units of \"range\" away from the critical temperature" <<
-				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?  ";
+				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << lattice_size<< std::endl << "?  ";
 			int tSteps; std::cin >> tSteps;
 			startT = T_CRIT - RANGE * tSteps;
 
 			std::cout << "Enter final temperature in units of \"range\" away from the critical temperature" <<
-				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?  ";
+				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << lattice_size << std::endl << "?  ";
 			std::cin >> tSteps;
 			endT = T_CRIT + RANGE * tSteps;
 		}
@@ -201,7 +202,7 @@ int main()
 
 
 		job["startT"] = startT;
-		jon["lattice_size"] = lattice_size;
+		job["lattice_size"] = lattice_size;
 		job["endT"] = endT;
 		job["N_samples"] = N_samples;
 		job["iterations"] = iterations;
