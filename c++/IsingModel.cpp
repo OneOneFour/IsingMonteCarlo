@@ -2,7 +2,7 @@
 #include <chrono>
 #include <iostream>
 IsingModel::IsingModel(int size, double t,int iterations) :rng{ rd() }, uni(0.0, size-1), r(0.0, 1.0), e(0),
-															m(0), sum_esq(0), sum_msq(0),iterations(iterations),
+													m(0), sum_esq(0), sum_msq(0),iterations(iterations),
 															sum_m(0),sum_e(0),abs_m(0)
 {
 	this->size = size;

@@ -12,13 +12,10 @@
 #include "IsingModel.h"
 #include "C2PyPlot.h"
 
-#define LATTICE_SIZE 50
-
 using json = nlohmann::json;
 
 constexpr auto ARR_LEN = 100;
 const double T_CRIT = 2.0 / log(1.0 + sqrt(2.0));
-const double RANGE = 5.0 / (4.0 * LATTICE_SIZE);
 
 // YES I KNOW THIS IS RAM INEFFICENT BLAH BLAH BLAH 
 std::vector<double> linspace(const double start, const double end, const int n_samples = 2) {
@@ -32,7 +29,7 @@ std::vector<double> linspace(const double start, const double end, const int n_s
 }
 
 
-void getData(const double start_temp, const double end_temp, const int N_steps, std::string path, int iterations = 1000000,
+void getData(const double start_temp, const double end_temp,int lattice_size, const int N_steps, std::string path, int iterations = 1000000,
 	int record_every = 200, int delay = 1000, int fileSize = 4000) {
 	path += ".json";
 	std::vector<double> t = linspace(start_temp, end_temp, N_steps);
@@ -46,7 +43,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
 	int batch = 0;
 #pragma omp parallel for
 	for (int i = 0; i < N_steps; i++) {
-		IsingModel model(LATTICE_SIZE, t[i], iterations);
+		IsingModel model(lattice_size, t[i], iterations);
 
 		model.start(record_every, delay);
 #pragma omp critical
@@ -122,7 +119,7 @@ void getData(const double start_temp, const double end_temp, const int N_steps, 
     metaJson["iterations"] = iterations;
     metaJson["record_every"] = record_every;
     metaJson["delay"] = delay;
-    metaJson["lattice_size"] = LATTICE_SIZE;
+    metaJson["lattice_size"] = lattice_size;
     metaJson["energy"] = e;
     metaJson["magnetization"] = m;
     metaJson["susceptibility"] = chi;
@@ -145,13 +142,16 @@ int main()
 	while (true) {
 		json job;
 		double startT, endT;
+		int lattice_size;
 		int N_samples, iterations, record_every, delay;
 		std::string path, response;
+		std::cout << "Enter lattice size:";
+		std::cin >> lattice_size;
 		do {
 			response = "";
-			std::cout << "Do you want to use absolute temperatures or those relative to critical point? (abs/rel)  ";
+			std::cout << "Do you want to use absolute temperatures or those relative to critical point? (abs/rel/rel_range)  ";
 			std::cin >> response;
-		} while (response != "abs" && response != "rel");
+		} while (response != "abs" && response != "rel" && response != "rel_range");
 		if (response == "abs") {
 			std::cout << "Enter starting temperature:  ";
 			std::cin >> startT;
@@ -159,7 +159,8 @@ int main()
 			std::cout << "Enter end temperature:  ";
 			std::cin >> endT;
 		}
-		else {
+		else if(response == "rel_range"){
+			double RANGE = 5.0 / (4.0 * lattice_size);
 			std::cout << "Enter starting temperature in units of \"range\" away from the critical temperature" <<
 				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?  ";
 			int tSteps; std::cin >> tSteps;
@@ -169,6 +170,12 @@ int main()
 				std::endl << "Range is defined as 5/4*latticeSize" << std::endl << "The lattice size is " << LATTICE_SIZE << std::endl << "?  ";
 			std::cin >> tSteps;
 			endT = T_CRIT + RANGE * tSteps;
+		}
+		else {
+			std::cout << "Enter temperature in units of Delta T away from the critical point (symmetric)";
+			int deltaT; std::cin >> deltaT;
+			startT = T_CRIT - deltaT;
+			endT = T_CRIT + deltaT;
 		}
 		std::cout << "Enter the number of steps between the temperatures:  ";
 		std::cin >> N_samples;
@@ -194,6 +201,7 @@ int main()
 
 
 		job["startT"] = startT;
+		jon["lattice_size"] = lattice_size;
 		job["endT"] = endT;
 		job["N_samples"] = N_samples;
 		job["iterations"] = iterations;
@@ -211,7 +219,7 @@ int main()
 		ppd.insert(0, "\\");
 		std::string path = strBuffer + ppd;
 		if (SetCurrentDirectory((path).c_str()) != 0 ) {
-			getData(job["startT"], job["endT"], job["N_samples"], job["path"], job["iterations"], job["record_every"], job["delay"]);
+			getData(job["startT"], job["endT"],job["lattice_size"],job["N_samples"], job["path"], job["iterations"], job["record_every"], job["delay"]);
 		}
 		else {
 			std::cout << "something bad happened when changing working directory" << std::endl;
