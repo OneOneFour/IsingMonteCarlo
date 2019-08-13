@@ -1,4 +1,6 @@
 import json
+import matplotlib
+matplotlib.use("Agg")
 import random
 from json import JSONDecodeError
 import sys
@@ -254,12 +256,13 @@ class IsingData:
             print(json_err)
             print("corrected")
 
-    def load_json(self, json_f):
+    def load_json(self, json_f, chdir=False):
         import os
         with open(json_f, 'r') as meta_j:
             meta_json = json.load(meta_j)
-            head, tail = os.path.split(json_f)
-            os.chdir(head)
+            if chdir:
+                head, tail = os.path.split(json_f)
+                os.chdir(head)
             if 'files' in meta_json:
                 for f in meta_json['files']:
                     with open(f, 'r') as f:
@@ -312,7 +315,8 @@ class IsingData:
             np.array(test_data, dtype=np.float32), np.array(test_label, dtype=np.int32)), (
                    np.array(validation_data, dtype=np.float32), np.array(validation_label, dtype=np.int32))
 
-    def plot_energy_spectrum(self, bins=10):
+    def plot_energy_spectrum(self, bins=10, fname=None):
+        plt.clf()
         if len(self.__images) == 0:
             raise ValueError("Please load images first! Call load,load_arr or load_json")
         # Sort by temperature
@@ -325,7 +329,25 @@ class IsingData:
             energies = [IsingLattice.energy_periodic(t['image'], 50) for t in self.__images if t['temp'] == temp]
             plt.hist(energies, bins=bins, label=temp)
         plt.legend()
-        plt.show()
+        if fname is not None:
+            plt.savefig(fname)
+
+    
+    def plot_magnetization_spectrum(self, bins=10, fname=None):
+        plt.clf()
+        if len(self.__images) == 0:
+            raise ValueError("Please load images first!")
+        temps = []
+        for t in self.__images:
+            if t['temp'] not in temps:
+                temps.append(t['temp'])
+        for t in temps:
+            magnetization = [IsingLattice.cur_magnetization(sample['image'], 50) for sample in self.__images if
+                             sample['temp'] == t]
+            plt.hist(magnetization, bins=bins, label=t)
+        plt.legend()
+        if fname is not None:
+            plt.savefig(fname)
 
     def get_data_flattened(self):
         np.random.shuffle(self.__images)

@@ -1,6 +1,6 @@
 import ast
 import sys
-
+import os
 from ising_feed_forward import plot_9_sample, plot_with_prediction, plot_train_val_acc, plot_train_val_loss
 from tensorflow.python.keras import models, layers
 from tensorflow.keras.callbacks import TensorBoard  # HAVE TO USE THIS NOT THE PYTHON ONE
@@ -10,19 +10,15 @@ import neptune_tensorboard as neptune_tb
 import neptune
 from datetime import datetime
 import numpy as np
-file = None
-files = [
-    "../c++/batch_0_atcrit06082019.json",
-    "../c++/batch_1_atcrit06082019.json",
-    "../c++/batch_2_atcrit06082019.json"
-]
+
 PARAMS = {
     "optimizer": "adam",
     "loss": "binary_crossentropy",
     "metrics": ["accuracy"],
     "epochs": 50,
     "batch_size": 64,
-    "periodic_padding": False
+    "periodic_padding": True
+
 }
 
 
@@ -62,21 +58,20 @@ def get_convolutional_network(use_periodic_pad=False):
     model.add(layers.Flatten())
     model.add(layers.Dense(128, activation='relu'))
     model.add(layers.Dense(1, activation='sigmoid'))
-    print(model)
     return model
 
 
 if __name__ == '__main__':
+    file = input("Enter JSON file to load into FFN")
+    head, tail = os.path.split(file)
+    os.chdir(os.path.join(os.getcwd(), head))
+    print(os.getcwd())
     if sys.argv[1] == "neptune":
         neptune.init(project_qualified_name="OneOneFour/Ising-Model")
         neptune_tb.integrate_with_tensorflow()
         ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.20)
-        if file:
-            ttf.load(file)
-        elif files:
-            ttf.load_arr(files)
-        else:
-            raise ValueError("Nothing provided to load")
+
+        ttf.load_json(tail)
         (train_image, train_label), (test_image, test_label), (val_image, val_label) = ttf.get_data()
 
         # normalise and reshape
@@ -86,11 +81,6 @@ if __name__ == '__main__':
         val_image = val_image.reshape((len(val_image), 50, 50, 1))
         exp_name = f"Convolutional {file} {datetime.now().strftime('%Y_%m_%d')}"
         with neptune.create_experiment(name=exp_name, params=PARAMS) as exp:
-            # if file:
-            #     exp.send_artifact(file)
-            # elif files:
-            #     for f in files:
-            #         exp.send_artifact(f)
 
             logdir = "..\\logs\\fit\\" + datetime.now().strftime("%Y%m%d-%H%M%S")
             callback = TensorBoard(log_dir=logdir)  # Make sure to save callback as a regular variable
@@ -102,19 +92,14 @@ if __name__ == '__main__':
                       callbacks=[callback], batch_size=PARAMS['batch_size'])
             loss, acc = model.evaluate(test_image, test_label)
             print(f"Model accuracy: {acc}")
-            exp.send_text("test-accuracy", acc)
-            exp.send_text("test-loss", loss)
-            weights_name = f"../weights/convolutional_weights {datetime.now().strftime('%Y_%m_%d %H_%M')}.h5"
+            exp.send_text("test-accuracy",str(acc))
+            exp.send_text("test-loss", str(loss))
+            weights_name = f"convolutional_weights {datetime.now().strftime('%Y_%m_%d %H_%M')}.h5"
             model.save_weights(weights_name)
             exp.send_artifact(weights_name)
     else:
         ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.5)
-        if file:
-            ttf.load(file)
-        elif files:
-            ttf.load_arr(files)
-        else:
-            raise ValueError("Nothing provided to load")
+        ttf.load_json(tail)
         (train_image, train_label), (test_image, test_label), (val_image, val_label) = ttf.get_data()
 
         # normalise and reshape

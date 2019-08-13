@@ -1,14 +1,11 @@
-import numpy as np
-import ast
 from tensorflow.keras import layers, models, regularizers, callbacks
+from PIL import Image
 import matplotlib.pyplot as plt
 from ising import IsingData
 import neptune_tensorboard as neptune_tb
-from time import time
 import neptune
 from datetime import datetime
-
-jFile = "../c++/veryclose4stepsatcrit/meta_veryclose4stepsatcrit.json"
+import os
 
 PARAMS = {
     "optimizer": "adam",
@@ -18,6 +15,8 @@ PARAMS = {
     "batch_size": 64,
     "l2_regularization_weight": 0.01,
     "layer_dropout": 0.3,
+    "layer_width":128,
+    "layer_depth":5
 
 }
 
@@ -95,14 +94,10 @@ def perceptron_test(training_data, training_labels, validation_data, validation_
 def feed_forward(training_data, training_labels, validation_data, validation_labels, callback, exp):
     model = models.Sequential()
     model.add(layers.Flatten(input_shape=(50, 50,)))
-    model.add(layers.Dense(512, activation='relu',
-                           kernel_regularizer=regularizers.l2(exp.get_parameters()['l2_regularization_weight'])))
-    model.add(layers.Dense(256, activation='relu',
-                           kernel_regularizer=regularizers.l2(exp.get_parameters()['l2_regularization_weight'])))
-    model.add(layers.Dense(256, activation='relu',
-                           kernel_regularizer=regularizers.l2(exp.get_parameters()["l2_regularization_weight"])))
-    model.add(layers.Dense(128,activation='relu'))
-    model.add(layers.Dense(128, activation='relu'))
+
+    for layer in range(PARAMS['layer_depth']):
+        model.add(layers.Dense(PARAMS["layer_width"],activation='relu',kernel_regularization = regularizers.l2(PARAMS["l2_regularization_weight"])))
+
     model.add(layers.Dropout(exp.get_parameters()['layer_dropout']))
     model.add(layers.Dense(1, activation='sigmoid'))
     model.compile(optimizer=PARAMS['optimizer'], loss=PARAMS['loss'], metrics=PARAMS['metrics'])
@@ -117,12 +112,24 @@ def feed_forward(training_data, training_labels, validation_data, validation_lab
 
 
 if __name__ == '__main__':
+    file = input("Enter JSON file to load into FFN")
+    head,tail = os.path.split(file)
+    os.chdir(os.path.join(os.getcwd(),head))
+    print(os.getcwd())
     neptune.init("OneOneFour/Ising-Model")
     neptune_tb.integrate_with_tensorflow()
     with neptune.create_experiment(name="Feed Forward Network", params=PARAMS) as exp:
         ttsg = IsingData(train_ratio=5)
-        ttsg.load_json(jFile)
-        ttsg.plot_energy_spectrum()
+        ttsg.load_json(tail)
+        ttsg.plot_energy_spectrum(20,"energy_spectrum.png")
+        ttsg.plot_magnetization_spectrum(20,"magnetization_spectrum.png")
+
+        energy_spectrum_img = Image.open("energy_spectrum.png")
+        magnetization_spectrum_img = Image.open("magnetization_spectrum.png")
+
+        exp.send_image("energy-spectrum",energy_spectrum_img)
+        exp.send_image("magnetization-spectrum",magnetization_spectrum_img)
+
         (train_images, train_labels), (test_images, test_labels), (val_image, val_data) = ttsg.get_data()
 
         train_images = (train_images + 1) / 2
@@ -136,7 +143,7 @@ if __name__ == '__main__':
         print(f"Model Accuracy on test set:{acc}")
         exp.send_text("test-accuracy", str(acc))
         exp.send_text("test-loss", str(loss))
-        exp.send_text("file-name", jFile)
+        exp.send_text("file-name", file)
         name = f"FFN_weights {datetime.now().strftime('%Y_%m_%d %H_%M')}.h5"
         model.save_weights(name)
         exp.send_artifact(name)

@@ -16,6 +16,8 @@
 # Mono auto generated files
 mono_crash.*
 
+c++/include/
+c++/enc_temp_folder/
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
@@ -353,4 +355,4 @@ dumps/
 json_dumps/
 logs/
 
-output.py
+c++/output.py
