@@ -268,6 +268,8 @@ class IsingData:
                 for f in meta_json['files']:
                     with open(f, 'r') as f:
                         self.__images.extend(json.load(f))
+            if 'lattice_size' in meta_json:
+                self.size = meta_json['lattice_size']
             else:
                 raise ValueError("No files to run!")
 
@@ -316,16 +318,16 @@ class IsingData:
             np.array(test_data, dtype=np.float32), np.array(test_label, dtype=np.int32)), (
                    np.array(validation_data, dtype=np.float32), np.array(validation_label, dtype=np.int32))
 
-    def plot_energy_spectrum(self, bins=20, fname=None):
+    def plot_energy_spectrum(self, bins=30, fname=None):
         plt.clf()
         if len(self.__images) == 0:
             raise ValueError("Please load images first! Call load,load_arr or load_json")
         # Sort by temperatur
-        energies_sub = [IsingLattice.energy_periodic(t['image'], 50) for t in self.__images if t['label'] == 0]
-        energies_sup = [IsingLattice.energy_periodic(t['image'], 50) for t in self.__images if t['label'] == 1]
+        energies_sub = [IsingLattice.energy_periodic(t['image'], self.size) for t in self.__images if t['label'] == 0]
+        energies_sup = [IsingLattice.energy_periodic(t['image'], self.size) for t in self.__images if t['label'] == 1]
         min_e = min(min(energies_sup), min(energies_sup))
         max_e = max(max(energies_sub), max(energies_sup))
-        n_sub, bins_sub, patches_sub = plt.hist(energies_sub, bins=bins, label="Subcritical", range=(min_e,max_e))
+        n_sub, bins_sub, patches_sub = plt.hist(energies_sub, bins=bins, label="Subcritical", range=(min_e, max_e))
         n_sup, bins_sup, patches_sup = plt.hist(energies_sup, bins=bins, label="Supercritical", range=(min_e, max_e))
 
         plt.legend()
@@ -333,25 +335,35 @@ class IsingData:
             plt.savefig(fname)
         frac = 0
         for i in range(len(n_sup)):
-            frac += min(n_sub[i],n_sup[i])
-        print(f"Overlap fraction:{frac/(sum(n_sub) + sum(n_sup))}")
+            frac += min(n_sub[i], n_sup[i])
+        print(f"Overlap fraction:{frac / (sum(n_sub) + sum(n_sup))}")
         # return overlap fraction
 
-    def plot_magnetization_spectrum(self, bins=20, fname=None):
+    def plot_magnetization_spectrum(self, bins=30, fname=None):
         plt.clf()
         if len(self.__images) == 0:
             raise ValueError("Please load images first!")
-        temps = []
-        for t in self.__images:
-            if t['temp'] not in temps:
-                temps.append(t['temp'])
-        for t in temps:
-            magnetization = [IsingLattice.cur_magnetization(sample['image'], 50) for sample in self.__images if
-                             sample['temp'] == t]
-            plt.hist(magnetization, bins=bins, label=t)
+
+        magnetization_sub = [IsingLattice.cur_magnetization(sample['image'], self.size) for sample in self.__images if
+                             sample['label'] == 0]
+        magnetization_sup = [IsingLattice.cur_magnetization(sample['image'], self.size) for sample in self.__images if
+                             sample['label'] == 1]
+
+        min_m = min(min(magnetization_sub), min(magnetization_sup))
+        max_m = max(max(magnetization_sup), max(magnetization_sub))
+
+        n_sub, bins_sub, patches_sub = plt.hist(magnetization_sub, bins=bins, label="Subcritical", range=(min_m, max_m))
+        n_sup, bins_sup, patches_sup = plt.hist(magnetization_sup, bins=bins, label="Supercritical",
+                                                range=(min_m, max_m))
         plt.legend()
         if fname is not None:
             plt.savefig(fname)
+
+        frac = 0
+        for i in range(len(n_sup)):
+            frac += min(n_sup[i],n_sub[i])
+
+        print(f"Overlap fraction:{frac / (sum(n_sub) + sum(n_sup))}")
 
     def get_data_flattened(self):
         np.random.shuffle(self.__images)

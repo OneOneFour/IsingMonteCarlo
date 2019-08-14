@@ -1,3 +1,6 @@
+import sys
+
+import numpy as np
 from tensorflow.keras import layers, models, regularizers, callbacks
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -15,9 +18,8 @@ PARAMS = {
     "batch_size": 64,
     "l2_regularization_weight": 0.01,
     "layer_dropout": 0.3,
-    "layer_width":128,
-    "layer_depth":5
-
+    "layer_width": 128,
+    "layer_depth": 5
 }
 
 
@@ -96,7 +98,8 @@ def feed_forward(training_data, training_labels, validation_data, validation_lab
     model.add(layers.Flatten(input_shape=(50, 50,)))
 
     for layer in range(PARAMS['layer_depth']):
-        model.add(layers.Dense(PARAMS["layer_width"],activation='relu',kernel_regularization = regularizers.l2(PARAMS["l2_regularization_weight"])))
+        model.add(layers.Dense(PARAMS["layer_width"], activation='relu',
+                               kernel_regularization=regularizers.l2(PARAMS["l2_regularization_weight"])))
 
     model.add(layers.Dropout(exp.get_parameters()['layer_dropout']))
     model.add(layers.Dense(1, activation='sigmoid'))
@@ -111,24 +114,23 @@ def feed_forward(training_data, training_labels, validation_data, validation_lab
     return model, hist_dict
 
 
-if __name__ == '__main__':
-    file = input("Enter JSON file to load into FFN")
-    head,tail = os.path.split(file)
-    os.chdir(os.path.join(os.getcwd(),head))
+def execute_feed_forward(file):
+    head, tail = os.path.split(file)
+    os.chdir(os.path.join(os.getcwd(), head))
     print(os.getcwd())
     neptune.init("OneOneFour/Ising-Model")
     neptune_tb.integrate_with_tensorflow()
     with neptune.create_experiment(name="Feed Forward Network", params=PARAMS) as exp:
         ttsg = IsingData(train_ratio=5)
         ttsg.load_json(tail)
-        ttsg.plot_energy_spectrum(20,"energy_spectrum.png")
-        ttsg.plot_magnetization_spectrum(20,"magnetization_spectrum.png")
+        ttsg.plot_energy_spectrum(20, "energy_spectrum.png")
+        ttsg.plot_magnetization_spectrum(20, "magnetization_spectrum.png")
 
         energy_spectrum_img = Image.open("energy_spectrum.png")
         magnetization_spectrum_img = Image.open("magnetization_spectrum.png")
 
-        exp.send_image("energy-spectrum",energy_spectrum_img)
-        exp.send_image("magnetization-spectrum",magnetization_spectrum_img)
+        exp.send_image("energy-spectrum", energy_spectrum_img)
+        exp.send_image("magnetization-spectrum", magnetization_spectrum_img)
 
         (train_images, train_labels), (test_images, test_labels), (val_image, val_data) = ttsg.get_data()
 
@@ -147,3 +149,36 @@ if __name__ == '__main__':
         name = f"FFN_weights {datetime.now().strftime('%Y_%m_%d %H_%M')}.h5"
         model.save_weights(name)
         exp.send_artifact(name)
+        return loss, acc
+
+
+if __name__ == '__main__':
+    file = input("Enter JSON file to load into FFN")
+    if sys.argv[1] == "test_width":
+        min_width = 32
+        max_width = 512
+        widths = np.linspace(min_width, max_width, 32)
+        acc = [0] * len(widths)
+        loss = [0] * len(widths)
+        for w, i in enumerate(widths):
+            PARAMS["layer_width"] = w
+            loss[i], acc[i] = execute_feed_forward(file)
+        plt.plot(widths, acc, label="Accuracy (Testing)")
+        plt.ylabel("Accuracy")
+        plt.xlabel("Network peak width")
+        plt.show()
+    elif sys.argv[1] == "test_depth":
+        min_depth = 1
+        max_depth = 10
+        depths = np.linspace(min_depth, max_depth, 32)
+        acc = [0] * len(depths)
+        loss = [0] * len(depths)
+        for d, i in enumerate(depths):
+            PARAMS["layer_depth"] = d
+            loss[i], acc[i] = execute_feed_forward(file)
+        plt.plot(depths, acc, label="Accuracy (Testing)")
+        plt.ylabel("Accuracy")
+        plt.xlabel("Network depth")
+        plt.show()
+    else:
+        execute_feed_forward(file)
