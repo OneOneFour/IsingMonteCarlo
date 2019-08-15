@@ -72,7 +72,7 @@ class IsingLattice:
         return np.abs(magnetization / (self.size ** 2))
         # Flip the configuration spin
 
-    def __wolff_step(self, i=0, im=None, max_iter=0):
+    def __wolff_step(self, i=0, im=None,ax2=None, max_iter=0):
         '''
         Work using bonds as opposed to individual spins on the lattice. Converts problem to a percolation problem
         which unlike Metropolis does not fall in to inf relaxation time at the critical temperature. :return: Artist
@@ -94,14 +94,15 @@ class IsingLattice:
         self.e = self.energy_periodic(self.lattice, self.size)
         self.m = self.cur_magnetization(self.lattice, self.size)
         if im:
+
             im.set_data(self.lattice)
             return im,
         else:
             return len(cluster) / self.size ** 2
 
-    def __metropolis_step(self, i=0, im=None, max_iter=5000):
+    def __metropolis_step(self, i=0, artists=None,ax2=None, max_iter=5000):
         for j in range(self.size ** 2):
-            if im:
+            if artists:
                 if i >= max_iter - 1:
                     plt.close()
                 # print(f"\rFrame:{f} of 5000", end='')
@@ -119,9 +120,14 @@ class IsingLattice:
                 self.m += (2 * self.lattice[rand_y][rand_x] / (self.size ** 2))
                 self.e += deltaE
 
-        if im:
-            im.set_data(self.lattice)
-            return im,
+        if artists:
+            self.t.append(self.t[-1] + 1)
+            self.e_bar.append(self.e_bar[-1] + (self.e - self.e_bar[-1]) / len(self.e_bar))
+            artists[0].set_data(self.lattice)
+            artists[1].set_data(self.t, self.e_bar)
+            ax2.set_xlim(min(self.t),max(self.t))
+            ax2.set_ylim(min(self.e_bar) ,max(self.e_bar) )
+            return artists
         return 1
 
     def start(self, method='metropolis', max_iter=5000, export_every=0, delay=0, log_correlation=False,
@@ -181,12 +187,15 @@ class IsingLattice:
 
     def start_animation(self, method='metropolis', max_iter=500000):
         import matplotlib.animation as animation
-        fig, ax = plt.subplots()
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+        self.t = [0]
+        self.e_bar = [self.energy_periodic(self.lattice, self.size)]
+        im = ax1.imshow(self.lattice, cmap='jet', animated=True, vmin=-1, vmax=1)
+        line2, = ax2.plot(self.t, self.e_bar, 'b-')
 
-        im = plt.imshow(self.lattice, cmap='jet', animated=True, vmin=-1, vmax=1)
-
+        artists = [im, line2]
         animation.FuncAnimation(fig, self.__wolff_step if method == 'wolff' else self.__metropolis_step,
-                                fargs=(im, max_iter), blit=True,
+                                fargs=(artists, ax2,max_iter), blit=True,
                                 frames=max_iter,
                                 interval=0,
                                 repeat=False)
@@ -333,7 +342,10 @@ class IsingData:
         frac = 0
         for i in range(len(n_sup)):
             frac += min(n_sub[i], n_sup[i])
-        print(f"Overlap fraction:{frac / (sum(n_sub) + sum(n_sup))}")
+        overlap = frac / (sum(n_sub) + sum(n_sup))
+        print(f"Overlap fraction:{overlap}")
+        return overlap
+
         # return overlap fraction
 
     def plot_magnetization_spectrum(self, bins=30, fname=None):
@@ -358,9 +370,10 @@ class IsingData:
 
         frac = 0
         for i in range(len(n_sup)):
-            frac += min(n_sup[i],n_sub[i])
-
-        print(f"Overlap fraction:{frac / (sum(n_sub) + sum(n_sup))}")
+            frac += min(n_sup[i], n_sub[i])
+        overlap = frac / (sum(n_sub) + sum(n_sup))
+        print(f"Overlap fraction:{overlap}")
+        return overlap
 
     def get_data_flattened(self):
         np.random.shuffle(self.__images)

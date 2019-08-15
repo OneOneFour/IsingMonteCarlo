@@ -48,12 +48,14 @@ def plot_9_sample(images, labels):
     plt.show()
 
 
-def plot_with_prediction(image, true_label, output):
-    plt.imshow(image, cmap="binary")
-    plt.title(f"Label Supercritical?:{bool(true_label)}")
-    plt.xticks([])
-    plt.yticks([])
-    plt.xlabel(f"Prediction:{'Supercritical' if output > 0.5 else 'Subcritical'} ({output * 100})")
+def plot_9_with_prediction(image, true_label, output):
+    fig, axes = plt.subplots(3, 3)
+    for i, ax in enumerate(fig.axes):
+        ax.imshow(image[i], cmap="binary")
+        ax.set_title(f"Label Supercritical?:{bool(true_label[i])}")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xlabel(f"Prediction:{'Supercritical' if output[i] > 0.5 else 'Subcritical'} ({output[i] * 100})")
     plt.show()
 
 
@@ -94,9 +96,9 @@ def perceptron_test(training_data, training_labels, validation_data, validation_
     return model, hist_dict
 
 
-def feed_forward(training_data, training_labels, validation_data, validation_labels, callback):
+def feed_forward(training_data, training_labels, validation_data, validation_labels, callback, size):
     model = models.Sequential()
-    model.add(layers.Flatten(input_shape=(50, 50,)))
+    model.add(layers.Flatten(input_shape=(size, size,)))
 
     for layer in range(PARAMS['layer_depth']):
         model.add(layers.Dense(PARAMS["layer_width"], activation='relu',
@@ -123,8 +125,8 @@ def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True):
     ttsg = IsingData(train_ratio=5)
     ttsg.load_json(tail)
     if plotspectrum:
-        ttsg.plot_energy_spectrum(20, "energy_spectrum.png")
-        ttsg.plot_magnetization_spectrum(20, "magnetization_spectrum.png")
+        e_overlap = ttsg.plot_energy_spectrum(20, "energy_spectrum.png")
+        m_overlap = ttsg.plot_magnetization_spectrum(20, "magnetization_spectrum.png")
         if runneptune:
             energy_spectrum_img = Image.open("energy_spectrum.png")
             magnetization_spectrum_img = Image.open("magnetization_spectrum.png")
@@ -132,16 +134,20 @@ def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True):
             exp.send_image("energy-spectrum", energy_spectrum_img)
             exp.send_image("magnetization-spectrum", magnetization_spectrum_img)
 
+            exp.send_metric("energy-overlap", e_overlap)
+            exp.send_metric("mag-overlap", m_overlap)
+
     (train_images, train_labels), (test_images, test_labels), (val_image, val_data) = ttsg.get_data()
 
     train_images = (train_images + 1) / 2
     test_images = (test_images + 1) / 2
     val_image = (val_image + 1) / 2
-    if plotspectrum:
-        plot_9_sample(test_images, test_labels)
-    callback = callbacks.TensorBoard(log_dir=f"logs\\ffn\\{datetime.now().strftime('%Y%m%d-%H%M%S')}")
-    model, hist_dict = feed_forward(train_images, train_labels, val_image, val_data, callback)
 
+    callback = callbacks.TensorBoard(log_dir=f"logs\\ffn\\{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+    model, hist_dict = feed_forward(train_images, train_labels, val_image, val_data, callback, ttsg.size)
+    if plotspectrum:
+        pred_label = model.predict(test_images[:9])
+        plot_9_with_prediction(test_images[:9], test_labels[:9], pred_label)
     loss, acc = model.evaluate(test_images, test_labels)
     print(f"Model Accuracy on test set:{acc}")
     if runneptune:
