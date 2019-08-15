@@ -1,7 +1,4 @@
 import json
-import matplotlib
-
-matplotlib.use("Agg")
 import random
 from json import JSONDecodeError
 import sys
@@ -325,7 +322,7 @@ class IsingData:
         # Sort by temperatur
         energies_sub = [IsingLattice.energy_periodic(t['image'], self.size) for t in self.__images if t['label'] == 0]
         energies_sup = [IsingLattice.energy_periodic(t['image'], self.size) for t in self.__images if t['label'] == 1]
-        min_e = min(min(energies_sup), min(energies_sup))
+        min_e = min(min(energies_sub), min(energies_sup))
         max_e = max(max(energies_sub), max(energies_sup))
         n_sub, bins_sub, patches_sub = plt.hist(energies_sub, bins=bins, label="Subcritical", range=(min_e, max_e))
         n_sup, bins_sup, patches_sup = plt.hist(energies_sup, bins=bins, label="Supercritical", range=(min_e, max_e))
@@ -350,7 +347,7 @@ class IsingData:
                              sample['label'] == 1]
 
         min_m = min(min(magnetization_sub), min(magnetization_sup))
-        max_m = max(max(magnetization_sup), max(magnetization_sub))
+        max_m = max(max(magnetization_sub), max(magnetization_sup))
 
         n_sub, bins_sub, patches_sub = plt.hist(magnetization_sub, bins=bins, label="Subcritical", range=(min_m, max_m))
         n_sup, bins_sup, patches_sup = plt.hist(magnetization_sup, bins=bins, label="Supercritical",
