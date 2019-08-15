@@ -276,6 +276,7 @@ class IsingData:
                         self.__images.extend(json.load(f))
             if 'lattice_size' in meta_json:
                 self.size = meta_json['lattice_size']
+
             else:
                 raise ValueError("No files to run!")
 

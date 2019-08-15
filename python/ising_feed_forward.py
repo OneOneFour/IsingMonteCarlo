@@ -120,10 +120,10 @@ def feed_forward(training_data, training_labels, validation_data, validation_lab
 def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True):
     neptune.init("OneOneFour/Ising-Model")
     neptune_tb.integrate_with_tensorflow()
-    if runneptune:
-        exp = neptune.create_experiment(name="Feed Forward Network", params=PARAMS)
     ttsg = IsingData(train_ratio=5)
     ttsg.load_json(tail)
+    if runneptune:
+        exp = neptune.create_experiment(name=f"DFFN on {ttsg.size}x{ttsg.size} on file {tail}", params=PARAMS)
     if plotspectrum:
         e_overlap = ttsg.plot_energy_spectrum(20, "energy_spectrum.png")
         m_overlap = ttsg.plot_magnetization_spectrum(20, "magnetization_spectrum.png")
