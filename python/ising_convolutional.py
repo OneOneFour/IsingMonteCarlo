@@ -62,6 +62,7 @@ def get_convolutional_network(shape, use_periodic_pad=False):
     model.add(layers.Flatten())
     model.add(layers.Dense(128, activation='relu'))
     model.add(layers.Dense(1, activation='sigmoid'))
+    print(model.summary())
     return model
 
 
@@ -75,14 +76,13 @@ if __name__ == '__main__':
         neptune_tb.integrate_with_tensorflow()
         ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.20)
         ttf.load_json(tail)
-        shape = ttf.size
         (train_image, train_label), (test_image, test_label), (val_image, val_label) = ttf.get_data()
 
         # normalise and reshape
 
-        train_image = train_image.reshape((len(train_image), shape, shape, 1))
-        test_image = test_image.reshape((len(test_image), shape, shape, 1))
-        val_image = val_image.reshape((len(val_image), shape, shape, 1))
+        train_image = train_image.reshape((len(train_image),ttf.size,ttf.size, 1))
+        test_image = test_image.reshape((len(test_image),ttf.size,ttf.size, 1))
+        val_image = val_image.reshape((len(val_image),ttf.size,ttf.size, 1))
         exp_name = f"Convolutional {file} {datetime.now().strftime('%Y_%m_%d')}"
         with neptune.create_experiment(name=exp_name, params=PARAMS) as exp:
 

@@ -119,6 +119,7 @@ double IsingModel::get_abs_mean_magnitization()
 }
 
 int IsingModel::metropolis_step(int i ) {
+	#pragma omp parallel for
 	for (int j = 0; j < this->size * this->size; j++) {
 		int randX = this->uni(this->rng);
 		int randY = this->uni(this->rng);
@@ -131,13 +132,15 @@ int IsingModel::metropolis_step(int i ) {
 		double p = exp(-(double)deltaE / this->t);
 		double r = this->r(this->rng);
 		if (deltaE <= 0 || r <= p) {
+				#pragma omp critical
+				{
+					this->flip_site(randX, randY);
 
-				this->flip_site(randX, randY);
+					double dm = (2.0 * (double)this->get_site(randX, randY));
 
-				double dm = (2.0 * (double)this->get_site(randX, randY));
-
-				this->e += deltaE;
-				this->m += dm;
+					this->e += deltaE;
+					this->m += dm;
+				}
 
 		}
 	}

@@ -5,3 +5,5 @@ numpy
 tqdm
 psutil
 scikit-learn
+neptune-client
+neptune-tensorboard

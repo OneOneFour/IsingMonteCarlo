@@ -41,60 +41,57 @@ void getData(const double start_temp, const double end_temp,int lattice_size, co
 	//main json file
 	json core_json = json::array();
 	int batch = 0;
-#pragma omp parallel for
 	for (int i = 0; i < N_steps; i++) {
 		IsingModel model(lattice_size, t[i], iterations);
 
 		model.start(record_every, delay);
-#pragma omp critical
-		{
 
-			std::cout << "Temperature: " << t[i] << std::endl;
+		std::cout << "Temperature: " << t[i] << std::endl;
 
-			e[i] = model.get_mean_energy();
-			std::cout << "Average E:" << e[i] << std::endl;
-			m[i] = model.get_abs_mean_magnitization();
-			std::cout << "Average m:" << m[i] << std::endl;
+		e[i] = model.get_mean_energy();
+		std::cout << "Average E:" << e[i] << std::endl;
+		m[i] = model.get_abs_mean_magnitization();
+		std::cout << "Average m:" << m[i] << std::endl;
 
-			chi[i] = model.get_m_variance() / t[i];
-			cv[i] = model.get_e_variance() / (t[i] * t[i]);
-			bool supercrit = t[i] >= 2.0 / log(1.0 + sqrt(2.0));
-			for (bool* arr : model.record_states) {
-				std::vector<std::vector<int>> shapedArr(lattice_size);
-				for (int j = 0, l = 0; j < lattice_size; j++) {
-					shapedArr[j].resize(lattice_size);
-					for (int k = 0; k < lattice_size; k++, l++) {
-						shapedArr[j][k] = arr[l] * 2- 1;
-					}
-				}
-				json item;
-				item["label"] = supercrit;
-				item["temp"] = t[i];
-				item["image"] = shapedArr;
-				core_json.push_back(item);
-				if (core_json.size() >= fileSize) {
-					std::string tmppath = path;
-					tmppath.insert(0, "batch_" + std::to_string(batch++) + "_");
-					std::ofstream file(tmppath);
-					file << core_json;
-					core_json = json::array();
-					file.close();
-					std::cout << "File:" << tmppath << " successfully written"<<std::endl;
+		chi[i] = model.get_m_variance() / t[i];
+		cv[i] = model.get_e_variance() / (t[i] * t[i]);
+		bool supercrit = t[i] >= 2.0 / log(1.0 + sqrt(2.0));
+		for (bool* arr : model.record_states) {
+			std::vector<std::vector<int>> shapedArr(lattice_size);
+			for (int j = 0, l = 0; j < lattice_size; j++) {
+				shapedArr[j].resize(lattice_size);
+				for (int k = 0; k < lattice_size; k++, l++) {
+					shapedArr[j][k] = arr[l] * 2- 1;
 				}
 			}
+			json item;
+			item["label"] = supercrit;
+			item["temp"] = t[i];
+			item["image"] = shapedArr;
+			core_json.push_back(item);
+			if (core_json.size() >= fileSize) {
+				std::string tmppath = path;
+				tmppath.insert(0, "batch_" + std::to_string(batch++) + "_");
+				std::ofstream file(tmppath);
+				file << core_json;
+				core_json = json::array();
+				file.close();
+				std::cout << "File:" << tmppath << " successfully written"<<std::endl;
+			}
+			
 		}
 
 
 	}
-
-	// file I/O timew
-	std::string tmppath = path;
-	tmppath.insert(0, "batch_" + std::to_string(batch++) + "_");
-	std::ofstream file(tmppath);
-	file << core_json; // lol should probably write the file!
-    file.close();
-	std::cout << "File:" << tmppath << " successfully written"<<std::endl;
-
+	if (core_json.size() > 0) {
+		// file I/O timew
+		std::string tmppath = path;
+		tmppath.insert(0, "batch_" + std::to_string(batch++) + "_");
+		std::ofstream file(tmppath);
+		file << core_json; // lol should probably write the file!
+		file.close();
+		std::cout << "File:" << tmppath << " successfully written" << std::endl;
+	}
 
 	// Write metadatafile
 	json metaJson;
@@ -119,8 +116,8 @@ void getData(const double start_temp, const double end_temp,int lattice_size, co
 	std::string metapath = "meta_"+ path;
 	std::ofstream metafile(metapath);
     metafile << metaJson;
-    file.close();
-    std::cout << "File:" << tmppath << " successfully written";
+    metafile.close();
+    std::cout << "File:" << metapath << " successfully written"<<std::endl;
 
 }
 
@@ -165,7 +162,7 @@ int main()
 		}
 		else {
 			std::cout << "Enter temperature in units of Delta T away from the critical point (symmetric)";
-			int deltaT; std::cin >> deltaT;
+			double deltaT; std::cin >> deltaT;
 			startT = T_CRIT - deltaT;
 			endT = T_CRIT + deltaT;
 		}
