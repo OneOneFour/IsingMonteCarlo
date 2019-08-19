@@ -5,6 +5,7 @@ from tensorflow.keras import layers, models, regularizers, callbacks
 from PIL import Image
 
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from ising import IsingData
 import neptune_tensorboard as neptune_tb
 import neptune
@@ -19,8 +20,9 @@ PARAMS = {
     "batch_size": 64,
     "l2_regularization_weight": 0.01,
     "layer_dropout": 0.3,
-    "layer_width": 64,
-    "layer_depth": 2
+    "layer_width": 128,
+    "layer_depth": 3,
+    "randomize_spins": True
 }
 
 
@@ -139,6 +141,11 @@ def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True):
 
     (train_images, train_labels), (test_images, test_labels), (val_image, val_data) = ttsg.get_data()
 
+    if PARAMS["randomize_spins"]:
+        train_images = np.array([t * -1 if np.random.uniform(0, 1) > 0.5 else t for t in train_images])
+        test_images = np.array([t * -1 if np.random.uniform(0, 1) > 0.5 else t for t in test_images])
+        val_image = np.array([t * -1 if np.random.uniform(0, 1) > 0.5 else t for t in val_image])
+
     train_images = (train_images + 1) / 2
     test_images = (test_images + 1) / 2
     val_image = (val_image + 1) / 2
@@ -170,7 +177,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         if sys.argv[1] == "test_width":
             min_width = 2
-            max_width = 512
+            max_width = 128
             widths = np.linspace(min_width, max_width, 32)
             acc = [0] * len(widths)
             loss = [0] * len(widths)
@@ -195,6 +202,30 @@ if __name__ == '__main__':
             plt.plot(depths, acc, label="Accuracy (Testing)")
             plt.ylabel("Accuracy")
             plt.xlabel("Network depth")
+            plt.show()
+        elif sys.argv[1] == "test_both":
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection="3d")
+            min_depth = 1
+            max_depth = 20
+            min_width = 2
+            max_width = 128
+
+            width_steps = 10
+            depth_steps = 10
+            depths = np.linspace(min_depth, max_depth, depth_steps, dtype=np.int32)
+            widths = np.linspace(min_width, max_width, width_steps, dtype=np.int32)
+
+            dv, wv = np.meshgrid(depths, widths)
+            acc = np.array([0] * (width_steps * depth_steps))
+            acc = acc.reshape((width_steps,depth_steps))
+            for i in range(depth_steps):
+                for j in range(width_steps):
+                    PARAMS["layer_depth"] = dv[j, i]
+                    PARAMS["layer_width"] = wv[j, i]
+                    loss_ij, acc_ij = execute_feed_forward(head, tail, plotspectrum=False, runneptune=False)
+                    acc[j, i] = acc_ij
+            ax.plot_surface(dv, wv, acc)
             plt.show()
     else:
         execute_feed_forward(head, tail)

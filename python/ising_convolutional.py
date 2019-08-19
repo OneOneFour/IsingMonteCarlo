@@ -1,7 +1,7 @@
 import ast
 import sys
 import os
-from ising_feed_forward import plot_9_sample, plot_with_prediction, plot_train_val_acc, plot_train_val_loss
+from ising_feed_forward import plot_9_sample, plot_train_val_acc, plot_train_val_loss
 from tensorflow.python.keras import models, layers
 from tensorflow.keras.callbacks import TensorBoard  # HAVE TO USE THIS NOT THE PYTHON ONE
 import tensorflow as tf
@@ -17,8 +17,10 @@ PARAMS = {
     "metrics": ["accuracy"],
     "epochs": 50,
     "batch_size": 64,
-    "periodic_padding": True
-
+    "periodic_padding": True,
+    "conv_depth": 2,
+    "conv_start_filters": 2,
+    "conv_increment": 2
 }
 
 
@@ -46,15 +48,17 @@ def periodic_pad(x):
     return res
 
 
-def get_convolutional_network(use_periodic_pad=False):
+def get_convolutional_network(shape, use_periodic_pad=False):
     model = models.Sequential()
-    if use_periodic_pad:
-        model.add(layers.Lambda(periodic_pad))
-    model.add(layers.Conv2D(16, (3, 3), activation='relu', input_shape=(50, 50, 1)))
-    model.add(layers.MaxPooling2D((2, 2)))
-    model.add(layers.Conv2D(32, (3, 3), activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2)))
-    model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+
+    for i in range(PARAMS["conv_depth"]):
+        if use_periodic_pad:
+            model.add(layers.Lambda(periodic_pad))
+        model.add(
+            layers.Conv2D(PARAMS["conv_start_filters"] + i * PARAMS["conv_increment"], (3, 3), activation='relu',
+                          input_shape=(shape, shape, 1)))
+        model.add(layers.MaxPooling2D((2, 2)))
+
     model.add(layers.Flatten())
     model.add(layers.Dense(128, activation='relu'))
     model.add(layers.Dense(1, activation='sigmoid'))
@@ -70,15 +74,15 @@ if __name__ == '__main__':
         neptune.init(project_qualified_name="OneOneFour/Ising-Model")
         neptune_tb.integrate_with_tensorflow()
         ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.20)
-
         ttf.load_json(tail)
+        shape = ttf.size
         (train_image, train_label), (test_image, test_label), (val_image, val_label) = ttf.get_data()
 
         # normalise and reshape
 
-        train_image = train_image.reshape((len(train_image), 50, 50, 1))
-        test_image = test_image.reshape((len(test_image), 50, 50, 1))
-        val_image = val_image.reshape((len(val_image), 50, 50, 1))
+        train_image = train_image.reshape((len(train_image), shape, shape, 1))
+        test_image = test_image.reshape((len(test_image), shape, shape, 1))
+        val_image = val_image.reshape((len(val_image), shape, shape, 1))
         exp_name = f"Convolutional {file} {datetime.now().strftime('%Y_%m_%d')}"
         with neptune.create_experiment(name=exp_name, params=PARAMS) as exp:
 
@@ -92,7 +96,7 @@ if __name__ == '__main__':
                       callbacks=[callback], batch_size=PARAMS['batch_size'])
             loss, acc = model.evaluate(test_image, test_label)
             print(f"Model accuracy: {acc}")
-            exp.send_text("test-accuracy",str(acc))
+            exp.send_text("test-accuracy", str(acc))
             exp.send_text("test-loss", str(loss))
             weights_name = f"convolutional_weights {datetime.now().strftime('%Y_%m_%d %H_%M')}.h5"
             model.save_weights(weights_name)
@@ -105,9 +109,9 @@ if __name__ == '__main__':
         # normalise and reshape
         logdir = "logs/convo/" + datetime.now().strftime("%Y%m%d-%H%M%S")
 
-        train_image = train_image.reshape((len(train_image), 50, 50, 1))
-        test_image = test_image.reshape((len(test_image), 50, 50, 1))
-        val_image = val_image.reshape((len(val_image), 50, 50, 1))
+        train_image = train_image.reshape((len(train_image), ttf.size, ttf.size, 1))
+        test_image = test_image.reshape((len(test_image), ttf.size, ttf.size, 1))
+        val_image = val_image.reshape((len(val_image), ttf.size, ttf.size, 1))
 
         model = get_convolutional_network(PARAMS['periodic_padding'])
         model.compile(optimizer=PARAMS['optimizer'],

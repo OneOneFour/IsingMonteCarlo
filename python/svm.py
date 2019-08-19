@@ -1,11 +1,13 @@
 '''
 Custom Implementation of the Support Vector Machine Algorithm
 '''
+import os
+
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
 from sklearn import metrics
-from ising import IsingData
+from ising import IsingData, IsingLattice
 
 data_dict = {
     -1: np.array([[1, 7],
@@ -48,12 +50,26 @@ data_dict = {
 #         return classification
 
 if __name__ == '__main__':
-    ttf = IsingData(size=50)
-    ttf.load("../dumps/dump_testT00-1(old).json")
-    (train_data, train_labels),(test_data, test_labels) = ttf.get_data_flattened()
-    svm = SVC(kernel="linear")
+    ttf = IsingData(train_ratio=5)
+    file = input("Enter JSON file to load")
+    head, tail = os.path.split(file)
+    os.chdir(os.path.join(os.getcwd(),head))
+    ttf.load_json(tail)
+    (train_data, train_labels), (test_data, test_labels),(validation_data,validation_labels) = ttf.get_data()
+    # svm = SVC(kernel="linear")
 
-    svm.fit(train_data, train_labels)
+    # svm.fit(train_data, train_labels)
+    energy_train_0 = [IsingLattice.energy_periodic(t, ttf.size) for i, t in enumerate(train_data) if
+                      train_labels[i] == 0]
+    magnetization_train_0 = [IsingLattice.cur_magnetization(t, ttf.size) for i, t in enumerate(train_data) if
+                             train_labels[i] == 0]
+    energy_train_1 = [IsingLattice.energy_periodic(t, ttf.size) for i, t in enumerate(train_data) if
+                      train_labels[i] == 1]
+    magnetization_train_1 = [IsingLattice.cur_magnetization(t, ttf.size) for i, t in enumerate(train_data) if
+                             train_labels[i] == 1]
 
-    predict_labels = svm.predict(test_data)
-    print(f"Accuracy:{metrics.accuracy_score(test_labels, predict_labels)}")
+    plt.scatter(energy_train_0, magnetization_train_0, c='r')
+    plt.scatter(energy_train_1, magnetization_train_1, c='b')
+    plt.show()
+    # predict_labels = svm.predict(test_data)
+    # print(f"Accuracy:{metrics.accuracy_score(test_labels, predict_labels)}")
