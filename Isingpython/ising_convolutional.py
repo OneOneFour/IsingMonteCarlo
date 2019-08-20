@@ -17,7 +17,7 @@ PARAMS = {
     "metrics": ["accuracy"],
     "epochs": 50,
     "batch_size": 64,
-    "periodic_padding": True,
+    "periodic_padding": False,
     "conv_depth": 2,
     "conv_start_filters": 2,
     "conv_increment": 2
@@ -66,64 +66,73 @@ def get_convolutional_network(shape, use_periodic_pad=False):
     return model
 
 
-if __name__ == '__main__':
-    file = input("Enter JSON file to load into FFN")
+def run_no_neptune(file):
     head, tail = os.path.split(file)
     os.chdir(os.path.join(os.getcwd(), head))
     print(os.getcwd())
-    if sys.argv[1] == "neptune":
-        neptune.init(project_qualified_name="OneOneFour/Ising-Model")
-        neptune_tb.integrate_with_tensorflow()
-        ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.20)
-        ttf.load_json(tail)
-        (train_image, train_label), (test_image, test_label), (val_image, val_label) = ttf.get_data()
+    ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.5)
+    ttf.load_json(tail)
+    (train_image, train_label), (test_image, test_label), (val_image, val_label) = ttf.get_data()
 
-        # normalise and reshape
+    # normalise and reshape
+    logdir = "logs/convo/" + datetime.now().strftime("%Y%m%d-%H%M%S")
 
-        train_image = train_image.reshape((len(train_image),ttf.size,ttf.size, 1))
-        test_image = test_image.reshape((len(test_image),ttf.size,ttf.size, 1))
-        val_image = val_image.reshape((len(val_image),ttf.size,ttf.size, 1))
+    train_image = train_image.reshape((len(train_image), ttf.size, ttf.size, 1))
+    test_image = test_image.reshape((len(test_image), ttf.size, ttf.size, 1))
+    val_image = val_image.reshape((len(val_image), ttf.size, ttf.size, 1))
 
+    model = get_convolutional_network(ttf.size, PARAMS['periodic_padding'])
+    model.compile(optimizer=PARAMS['optimizer'],
+                  loss=PARAMS['loss'],
+                  metrics=PARAMS['metrics'])
 
-        exp_name = f"Convolutional {file} {datetime.now().strftime('%Y_%m_%d')}"
-        with neptune.create_experiment(name=exp_name, params=PARAMS) as exp:
+    history = model.fit(train_image, train_label, epochs=PARAMS['epochs'], validation_data=(val_image, val_label),
+              batch_size=PARAMS['batch_size'])
+    print(model.summary())
+    loss, acc = model.evaluate(test_image, test_label)
+    print(f"Model accuracy: {acc}")
+    return acc
 
-            logdir = "..\\logs\\fit\\" + datetime.now().strftime("%Y%m%d-%H%M%S")
-            callback = TensorBoard(log_dir=logdir)  # Make sure to save callback as a regular variable
-            model = get_convolutional_network(ttf.size,exp.get_parameters()['periodic_padding'])
-            model.compile(optimizer=exp.get_parameters()['optimizer'],
-                          loss=exp.get_parameters()['loss'],
-                          metrics=ast.literal_eval(exp.get_parameters()['metrics']))
+def run_neptune(file):
+    head, tail = os.path.split(file)
+    os.chdir(os.path.join(os.getcwd(), head))
+    print(os.getcwd())
+    neptune.init(project_qualified_name="OneOneFour/Ising-Model")
+    neptune_tb.integrate_with_tensorflow()
+    ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.20)
+    ttf.load_json(tail)
+    (train_image, train_label), (test_image, test_label), (val_image, val_label) = ttf.get_data()
 
-            model.fit(train_image, train_label, epochs=PARAMS['epochs'], validation_data=(val_image, val_label),
-                      callbacks=[callback], batch_size=PARAMS['batch_size'])
-            print(model.summary())
-            loss, acc = model.evaluate(test_image, test_label)
-            print(f"Model accuracy: {acc}")
-            exp.send_text("test-accuracy", str(acc))
-            exp.send_text("test-loss", str(loss))
-            weights_name = f"convolutional_weights {datetime.now().strftime('%Y_%m_%d %H_%M')}.h5"
-            model.save_weights(weights_name)
-            exp.send_artifact(weights_name)
-    else:
-        ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.5)
-        ttf.load_json(tail)
-        (train_image, train_label), (test_image, test_label), (val_image, val_label) = ttf.get_data()
+    # normalise and reshape
 
-        # normalise and reshape
-        logdir = "logs/convo/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    train_image = train_image.reshape((len(train_image), ttf.size, ttf.size, 1))
+    test_image = test_image.reshape((len(test_image), ttf.size, ttf.size, 1))
+    val_image = val_image.reshape((len(val_image), ttf.size, ttf.size, 1))
 
-        train_image = train_image.reshape((len(train_image), ttf.size, ttf.size, 1))
-        test_image = test_image.reshape((len(test_image), ttf.size, ttf.size, 1))
-        val_image = val_image.reshape((len(val_image), ttf.size, ttf.size, 1))
+    exp_name = f"Convolutional {file} {datetime.now().strftime('%Y_%m_%d')}"
+    with neptune.create_experiment(name=exp_name, params=PARAMS) as exp:
+        logdir = "..\\logs\\fit\\" + datetime.now().strftime("%Y%m%d-%H%M%S")
+        callback = TensorBoard(log_dir=logdir)  # Make sure to save callback as a regular variable
+        model = get_convolutional_network(ttf.size, exp.get_parameters()['periodic_padding'])
+        model.compile(optimizer=exp.get_parameters()['optimizer'],
+                      loss=exp.get_parameters()['loss'],
+                      metrics=ast.literal_eval(exp.get_parameters()['metrics']))
 
-        model = get_convolutional_network(ttf.size,PARAMS['periodic_padding'])
-        model.compile(optimizer=PARAMS['optimizer'],
-                      loss=PARAMS['loss'],
-                      metrics=PARAMS['metrics'])
-
-        model.fit(train_image, train_label, epochs=PARAMS['epochs'], validation_data=(val_image, val_label),
-                  batch_size=PARAMS['batch_size'])
+        history = model.fit(train_image, train_label, epochs=PARAMS['epochs'], validation_data=(val_image, val_label),
+                  callbacks=[callback], batch_size=PARAMS['batch_size'])
         print(model.summary())
         loss, acc = model.evaluate(test_image, test_label)
         print(f"Model accuracy: {acc}")
+        exp.send_text("test-accuracy", str(acc))
+        exp.send_text("test-loss", str(loss))
+        weights_name = f"convolutional_weights {datetime.now().strftime('%Y_%m_%d %H_%M')}.h5"
+        model.save_weights(weights_name)
+        exp.send_artifact(weights_name)
+
+
+if __name__ == '__main__':
+    file = input("Enter JSON file to load into FFN")
+    if sys.argv[1] == "neptune":
+        run_neptune(file)
+    else:
+        run_no_neptune(file)

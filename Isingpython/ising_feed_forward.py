@@ -178,69 +178,91 @@ def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True, use_max
         return loss, acc
 
 
-if __name__ == '__main__':
-    file = input("Enter JSON file to load into FFN")
+def test_width(file):
     head, tail = os.path.split(file)
     os.chdir(os.path.join(os.getcwd(), head))
     print(os.getcwd())
+    min_width = 2
+    max_width = 128
+    widths = np.linspace(min_width, max_width, 32)
+    acc = [0] * len(widths)
+    loss = [0] * len(widths)
+    for i, w in enumerate(widths):
+        PARAMS["layer_width"] = w
+        loss[i], acc[i] = execute_feed_forward(head, tail, plotspectrum=False, runneptune=False)
+    import matplotlib
+
+    plt.plot(widths, acc, label="Accuracy (Testing)")
+    plt.ylabel("Accuracy")
+    plt.xlabel("Network peak width")
+    plt.savefig("Accuracy_vs_networkwidth")
+    plt.show()
+
+
+def test_depth(file):
+    head, tail = os.path.split(file)
+    os.chdir(os.path.join(os.getcwd(), head))
+    print(os.getcwd())
+    min_depth = 1
+    max_depth = 20
+    depths = np.linspace(min_depth, max_depth, 20, dtype=np.int32)
+    acc = [0] * len(depths)
+    loss = [0] * len(depths)
+    for i, d in enumerate(depths):
+        PARAMS["layer_depth"] = d
+        loss[i], acc[i] = execute_feed_forward(head, tail, plotspectrum=False, runneptune=False)
+    plt.plot(depths, acc, label="Accuracy (Testing)")
+    plt.ylabel("Accuracy")
+    plt.xlabel("Network depth")
+    plt.savefig("Accuracy_vs_networkdepth.png")
+    plt.show()
+
+
+def test_both(file):
+    head, tail = os.path.split(file)
+    os.chdir(os.path.join(os.getcwd(), head))
+    print(os.getcwd())
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+    min_depth = 1
+    max_depth = 10
+    min_width = 2
+    max_width = 128
+
+    width_steps = 10
+    depth_steps = 10
+    depths = np.linspace(min_depth, max_depth, depth_steps, dtype=np.int32)
+    widths = np.linspace(min_width, max_width, width_steps, dtype=np.int32)
+
+    dv, wv = np.meshgrid(depths, widths)
+    acc = np.zeros((width_steps, depth_steps))
+    for i in range(depth_steps):
+        for j in range(width_steps):
+            PARAMS["layer_depth"] = dv[j, i]
+            PARAMS["layer_width"] = wv[j, i]
+            loss_ij, acc_ij = execute_feed_forward(head, tail, plotspectrum=False, runneptune=False)
+            acc[j, i] = acc_ij
+    ax.plot_surface(dv, wv, acc, cmap="jet")
+    ax.set_xlabel("Network depth")
+    ax.set_ylabel("Network width")
+    ax.set_zlabel("Accuracy")
+    ax.set_title(f"{tail}")
+    plt.savefig(f"Accuracy_vs_network.png")
+    plt.show()
+
+
+if __name__ == '__main__':
+    file = input("Enter JSON file to load into FFN")
     if len(sys.argv) > 1:
         if sys.argv[1] == "test_width":
-            min_width = 2
-            max_width = 128
-            widths = np.linspace(min_width, max_width, 32)
-            acc = [0] * len(widths)
-            loss = [0] * len(widths)
-            for i, w in enumerate(widths):
-                PARAMS["layer_width"] = w
-                loss[i], acc[i] = execute_feed_forward(head, tail, plotspectrum=False, runneptune=False)
-            import matplotlib
-
-            plt.plot(widths, acc, label="Accuracy (Testing)")
-            plt.ylabel("Accuracy")
-            plt.xlabel("Network peak width")
-            plt.savefig("Accuracy_vs_networkwidth")
-            plt.show()
+            test_width(file)
         elif sys.argv[1] == "test_depth":
-            min_depth = 1
-            max_depth = 20
-            depths = np.linspace(min_depth, max_depth, 20, dtype=np.int32)
-            acc = [0] * len(depths)
-            loss = [0] * len(depths)
-            for i, d in enumerate(depths):
-                PARAMS["layer_depth"] = d
-                loss[i], acc[i] = execute_feed_forward(head, tail, plotspectrum=False, runneptune=False)
-            plt.plot(depths, acc, label="Accuracy (Testing)")
-            plt.ylabel("Accuracy")
-            plt.xlabel("Network depth")
-            plt.savefig("Accuracy_vs_networkdepth.png")
-            plt.show()
+            test_depth(file)
+
         elif sys.argv[1] == "test_both":
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection="3d")
-            min_depth = 1
-            max_depth = 10
-            min_width = 2
-            max_width = 128
-
-            width_steps = 10
-            depth_steps = 10
-            depths = np.linspace(min_depth, max_depth, depth_steps, dtype=np.int32)
-            widths = np.linspace(min_width, max_width, width_steps, dtype=np.int32)
-
-            dv, wv = np.meshgrid(depths, widths)
-            acc = np.zeros((width_steps, depth_steps))
-            for i in range(depth_steps):
-                for j in range(width_steps):
-                    PARAMS["layer_depth"] = dv[j, i]
-                    PARAMS["layer_width"] = wv[j, i]
-                    loss_ij, acc_ij = execute_feed_forward(head, tail, plotspectrum=False, runneptune=False)
-                    acc[j, i] = acc_ij
-            ax.plot_surface(dv, wv, acc, cmap="jet")
-            ax.set_xlabel("Network depth")
-            ax.set_ylabel("Network width")
-            ax.set_zlabel("Accuracy")
-            ax.set_title(f"{tail}")
-            plt.savefig(f"Accuracy_vs_network.png")
-            plt.show()
+            test_both(file)
     else:
+        head, tail = os.path.split(file)
+        os.chdir(os.path.join(os.getcwd(), head))
+        print(os.getcwd())
         execute_feed_forward(head, tail)
