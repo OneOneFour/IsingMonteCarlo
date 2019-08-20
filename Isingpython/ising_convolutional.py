@@ -66,10 +66,8 @@ def get_convolutional_network(shape, use_periodic_pad=False):
     return model
 
 
-def run_no_neptune(file):
-    head, tail = os.path.split(file)
-    os.chdir(os.path.join(os.getcwd(), head))
-    print(os.getcwd())
+def run_no_neptune(head,tail):
+
     ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.5)
     ttf.load_json(tail)
     (train_image, train_label), (test_image, test_label), (val_image, val_label) = ttf.get_data()
@@ -93,10 +91,8 @@ def run_no_neptune(file):
     print(f"Model accuracy: {acc}")
     return acc
 
-def run_neptune(file):
-    head, tail = os.path.split(file)
-    os.chdir(os.path.join(os.getcwd(), head))
-    print(os.getcwd())
+def run_neptune(head,tail):
+
     neptune.init(project_qualified_name="OneOneFour/Ising-Model")
     neptune_tb.integrate_with_tensorflow()
     ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.20)
@@ -109,7 +105,7 @@ def run_neptune(file):
     test_image = test_image.reshape((len(test_image), ttf.size, ttf.size, 1))
     val_image = val_image.reshape((len(val_image), ttf.size, ttf.size, 1))
 
-    exp_name = f"Convolutional {file} {datetime.now().strftime('%Y_%m_%d')}"
+    exp_name = f"Convolutional {tail} {datetime.now().strftime('%Y_%m_%d')}"
     with neptune.create_experiment(name=exp_name, params=PARAMS) as exp:
         logdir = "..\\logs\\fit\\" + datetime.now().strftime("%Y%m%d-%H%M%S")
         callback = TensorBoard(log_dir=logdir)  # Make sure to save callback as a regular variable
@@ -128,11 +124,14 @@ def run_neptune(file):
         weights_name = f"convolutional_weights {datetime.now().strftime('%Y_%m_%d %H_%M')}.h5"
         model.save_weights(weights_name)
         exp.send_artifact(weights_name)
-
+    return acc
 
 if __name__ == '__main__':
     file = input("Enter JSON file to load into FFN")
+    head, tail = os.path.split(file)
+    os.chdir(os.path.join(os.getcwd(), head))
+    print(os.getcwd())
     if sys.argv[1] == "neptune":
-        run_neptune(file)
+        run_neptune(head,tail)
     else:
-        run_no_neptune(file)
+        run_no_neptune(head,tail)

@@ -167,7 +167,7 @@ def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True, use_max
         exp.send_text("test-accuracy", str(acc))
         exp.send_metric("max_acc", max_acc)
         exp.send_text("test-loss", str(loss))
-        exp.send_text("file-name", file)
+        exp.send_text("file-name", tail)
         name = f"FFN_weights {datetime.now().strftime('%Y_%m_%d %H_%M')}.h5"
         model.save_weights(name)
         exp.send_artifact(name)
@@ -178,10 +178,7 @@ def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True, use_max
         return loss, acc
 
 
-def test_width(file):
-    head, tail = os.path.split(file)
-    os.chdir(os.path.join(os.getcwd(), head))
-    print(os.getcwd())
+def test_width(head, tail):
     min_width = 2
     max_width = 128
     widths = np.linspace(min_width, max_width, 32)
@@ -197,12 +194,10 @@ def test_width(file):
     plt.xlabel("Network peak width")
     plt.savefig("Accuracy_vs_networkwidth")
     plt.show()
+    return acc
 
 
-def test_depth(file):
-    head, tail = os.path.split(file)
-    os.chdir(os.path.join(os.getcwd(), head))
-    print(os.getcwd())
+def test_depth(head, tail):
     min_depth = 1
     max_depth = 20
     depths = np.linspace(min_depth, max_depth, 20, dtype=np.int32)
@@ -216,12 +211,10 @@ def test_depth(file):
     plt.xlabel("Network depth")
     plt.savefig("Accuracy_vs_networkdepth.png")
     plt.show()
+    return acc
 
 
-def test_both(file):
-    head, tail = os.path.split(file)
-    os.chdir(os.path.join(os.getcwd(), head))
-    print(os.getcwd())
+def test_both(head, tail):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
     min_depth = 1
@@ -249,20 +242,22 @@ def test_both(file):
     ax.set_title(f"{tail}")
     plt.savefig(f"Accuracy_vs_network.png")
     plt.show()
+    return acc
 
 
 if __name__ == '__main__':
     file = input("Enter JSON file to load into FFN")
+    head, tail = os.path.split(file)
+    os.chdir(os.path.join(os.getcwd(), head))
+    print(os.getcwd())
     if len(sys.argv) > 1:
         if sys.argv[1] == "test_width":
-            test_width(file)
+            test_width(head, tail)
         elif sys.argv[1] == "test_depth":
-            test_depth(file)
+            test_depth(head, tail)
 
         elif sys.argv[1] == "test_both":
-            test_both(file)
+            test_both(head, tail)
     else:
-        head, tail = os.path.split(file)
-        os.chdir(os.path.join(os.getcwd(), head))
-        print(os.getcwd())
+
         execute_feed_forward(head, tail)
