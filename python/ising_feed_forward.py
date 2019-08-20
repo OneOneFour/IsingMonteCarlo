@@ -119,7 +119,7 @@ def feed_forward(training_data, training_labels, validation_data, validation_lab
     return model, hist_dict
 
 
-def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True):
+def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True, use_max=False):
     neptune.init("OneOneFour/Ising-Model")
     neptune_tb.integrate_with_tensorflow()
     ttsg = IsingData(train_ratio=5)
@@ -152,21 +152,30 @@ def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True):
 
     callback = callbacks.TensorBoard(log_dir=f"logs\\ffn\\{datetime.now().strftime('%Y%m%d-%H%M%S')}")
     model, hist_dict = feed_forward(train_images, train_labels, val_image, val_data, callback, ttsg.size)
+
     if plotspectrum:
         pred_label = model.predict(test_images[:9])
         plot_9_with_prediction(test_images[:9], test_labels[:9], pred_label)
+
+    max_acc = max(hist_dict["val_acc"])
+
     loss, acc = model.evaluate(test_images, test_labels)
+
     print(f"Model Accuracy on test set:{acc}")
     if runneptune:
         exp.send_artifact(tail)
         exp.send_text("test-accuracy", str(acc))
+        exp.send_metric("max_acc", max_acc)
         exp.send_text("test-loss", str(loss))
         exp.send_text("file-name", file)
         name = f"FFN_weights {datetime.now().strftime('%Y_%m_%d %H_%M')}.h5"
         model.save_weights(name)
         exp.send_artifact(name)
         exp.stop()
-    return loss, acc
+    if use_max:
+        return loss, max_acc
+    else:
+        return loss, acc
 
 
 if __name__ == '__main__':
@@ -189,6 +198,7 @@ if __name__ == '__main__':
             plt.plot(widths, acc, label="Accuracy (Testing)")
             plt.ylabel("Accuracy")
             plt.xlabel("Network peak width")
+            plt.savefig("Accuracy_vs_networkwidth")
             plt.show()
         elif sys.argv[1] == "test_depth":
             min_depth = 1
@@ -202,12 +212,13 @@ if __name__ == '__main__':
             plt.plot(depths, acc, label="Accuracy (Testing)")
             plt.ylabel("Accuracy")
             plt.xlabel("Network depth")
+            plt.savefig("Accuracy_vs_networkdepth.png")
             plt.show()
         elif sys.argv[1] == "test_both":
             fig = plt.figure()
             ax = fig.add_subplot(111, projection="3d")
             min_depth = 1
-            max_depth = 20
+            max_depth = 10
             min_width = 2
             max_width = 128
 
@@ -217,15 +228,19 @@ if __name__ == '__main__':
             widths = np.linspace(min_width, max_width, width_steps, dtype=np.int32)
 
             dv, wv = np.meshgrid(depths, widths)
-            acc = np.array([0] * (width_steps * depth_steps))
-            acc = acc.reshape((width_steps,depth_steps))
+            acc = np.zeros((width_steps, depth_steps))
             for i in range(depth_steps):
                 for j in range(width_steps):
                     PARAMS["layer_depth"] = dv[j, i]
                     PARAMS["layer_width"] = wv[j, i]
                     loss_ij, acc_ij = execute_feed_forward(head, tail, plotspectrum=False, runneptune=False)
                     acc[j, i] = acc_ij
-            ax.plot_surface(dv, wv, acc)
+            ax.plot_surface(dv, wv, acc, cmap="jet")
+            ax.set_xlabel("Network depth")
+            ax.set_ylabel("Network width")
+            ax.set_zlabel("Accuracy")
+            ax.set_title(f"{tail}")
+            plt.savefig(f"Accuracy_vs_network.png")
             plt.show()
     else:
         execute_feed_forward(head, tail)

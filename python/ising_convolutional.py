@@ -62,7 +62,7 @@ def get_convolutional_network(shape, use_periodic_pad=False):
     model.add(layers.Flatten())
     model.add(layers.Dense(128, activation='relu'))
     model.add(layers.Dense(1, activation='sigmoid'))
-    print(model.summary())
+
     return model
 
 
@@ -83,17 +83,21 @@ if __name__ == '__main__':
         train_image = train_image.reshape((len(train_image),ttf.size,ttf.size, 1))
         test_image = test_image.reshape((len(test_image),ttf.size,ttf.size, 1))
         val_image = val_image.reshape((len(val_image),ttf.size,ttf.size, 1))
+
+
         exp_name = f"Convolutional {file} {datetime.now().strftime('%Y_%m_%d')}"
         with neptune.create_experiment(name=exp_name, params=PARAMS) as exp:
 
             logdir = "..\\logs\\fit\\" + datetime.now().strftime("%Y%m%d-%H%M%S")
             callback = TensorBoard(log_dir=logdir)  # Make sure to save callback as a regular variable
-            model = get_convolutional_network(exp.get_parameters()['periodic_padding'])
+            model = get_convolutional_network(ttf.size,exp.get_parameters()['periodic_padding'])
             model.compile(optimizer=exp.get_parameters()['optimizer'],
                           loss=exp.get_parameters()['loss'],
                           metrics=ast.literal_eval(exp.get_parameters()['metrics']))
+
             model.fit(train_image, train_label, epochs=PARAMS['epochs'], validation_data=(val_image, val_label),
                       callbacks=[callback], batch_size=PARAMS['batch_size'])
+            print(model.summary())
             loss, acc = model.evaluate(test_image, test_label)
             print(f"Model accuracy: {acc}")
             exp.send_text("test-accuracy", str(acc))
@@ -113,11 +117,13 @@ if __name__ == '__main__':
         test_image = test_image.reshape((len(test_image), ttf.size, ttf.size, 1))
         val_image = val_image.reshape((len(val_image), ttf.size, ttf.size, 1))
 
-        model = get_convolutional_network(PARAMS['periodic_padding'])
+        model = get_convolutional_network(ttf.size,PARAMS['periodic_padding'])
         model.compile(optimizer=PARAMS['optimizer'],
                       loss=PARAMS['loss'],
                       metrics=PARAMS['metrics'])
+
         model.fit(train_image, train_label, epochs=PARAMS['epochs'], validation_data=(val_image, val_label),
                   batch_size=PARAMS['batch_size'])
+        print(model.summary())
         loss, acc = model.evaluate(test_image, test_label)
         print(f"Model accuracy: {acc}")
