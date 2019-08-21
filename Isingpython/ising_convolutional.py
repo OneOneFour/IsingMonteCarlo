@@ -50,13 +50,15 @@ def periodic_pad(x):
 
 def get_convolutional_network(shape, use_periodic_pad=False):
     model = models.Sequential()
+    if use_periodic_pad:
+        model.add(layers.Lambda(periodic_pad))
+    model.add(layers.Conv2D(PARAMS["conv_start_filters"], (3, 3), activation='relu', input_shape=(shape, shape, 1)))
+    model.add(layers.MaxPooling2D((2, 2)))
 
-    for i in range(PARAMS["conv_depth"]):
-        if use_periodic_pad:
-            model.add(layers.Lambda(periodic_pad))
+
+    for i in range(1, PARAMS["conv_depth"]):
         model.add(
-            layers.Conv2D(PARAMS["conv_start_filters"] + i * PARAMS["conv_increment"], (3, 3), activation='relu',
-                          input_shape=(shape, shape, 1)))
+            layers.Conv2D(PARAMS["conv_start_filters"] + i * PARAMS["conv_increment"], (3, 3), activation='relu'))
         model.add(layers.MaxPooling2D((2, 2)))
 
     model.add(layers.Flatten())
@@ -66,8 +68,7 @@ def get_convolutional_network(shape, use_periodic_pad=False):
     return model
 
 
-def run_no_neptune(head,tail):
-
+def run_no_neptune(head, tail):
     ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.5)
     ttf.load_json(tail)
     (train_image, train_label), (test_image, test_label), (val_image, val_label) = ttf.get_data()
@@ -85,14 +86,14 @@ def run_no_neptune(head,tail):
                   metrics=PARAMS['metrics'])
 
     history = model.fit(train_image, train_label, epochs=PARAMS['epochs'], validation_data=(val_image, val_label),
-              batch_size=PARAMS['batch_size'])
+                        batch_size=PARAMS['batch_size'])
     print(model.summary())
     loss, acc = model.evaluate(test_image, test_label)
     print(f"Model accuracy: {acc}")
     return acc
 
-def run_neptune(head,tail):
 
+def run_neptune(head, tail):
     neptune.init(project_qualified_name="OneOneFour/Ising-Model")
     neptune_tb.integrate_with_tensorflow()
     ttf = IsingData(train_ratio=1, test_ratio=0.5, validation_ratio=0.20)
@@ -115,7 +116,7 @@ def run_neptune(head,tail):
                       metrics=ast.literal_eval(exp.get_parameters()['metrics']))
 
         history = model.fit(train_image, train_label, epochs=PARAMS['epochs'], validation_data=(val_image, val_label),
-                  callbacks=[callback], batch_size=PARAMS['batch_size'])
+                            callbacks=[callback], batch_size=PARAMS['batch_size'])
         print(model.summary())
         loss, acc = model.evaluate(test_image, test_label)
         print(f"Model accuracy: {acc}")
@@ -126,12 +127,13 @@ def run_neptune(head,tail):
         exp.send_artifact(weights_name)
     return acc
 
+
 if __name__ == '__main__':
     file = input("Enter JSON file to load into FFN")
     head, tail = os.path.split(file)
     os.chdir(os.path.join(os.getcwd(), head))
     print(os.getcwd())
     if sys.argv[1] == "neptune":
-        run_neptune(head,tail)
+        run_neptune(head, tail)
     else:
-        run_no_neptune(head,tail)
+        run_no_neptune(head, tail)
