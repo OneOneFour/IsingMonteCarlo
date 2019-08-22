@@ -119,6 +119,22 @@ def feed_forward(training_data, training_labels, validation_data, validation_lab
     return model, hist_dict
 
 
+def feed_forward_residual(head,tail):
+    neptune.init("OneOneFour/Ising-Model")
+    neptune_tb.integrate_with_tensorflow()
+
+    ising_data = IsingData(train_ratio=5)
+    ising_data.load_json(tail)
+
+    (train_data,train_labels),(test_data,test_labels),(val_data,val_labels) = ising_data.get_data()
+
+    with neptune.create_experiment(name=f"Residual feed forward") as exp:
+        pass
+
+        # Randomise spins
+
+
+
 def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True, use_max=False):
     neptune.init("OneOneFour/Ising-Model")
     neptune_tb.integrate_with_tensorflow()
