@@ -1,11 +1,12 @@
 import sys
 
 import numpy as np
-from tensorflow.keras import layers, models, regularizers, callbacks
+from tensorflow.keras import layers, models, regularizers, callbacks, Input
 from PIL import Image
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+
 from ising import IsingData
 import neptune_tensorboard as neptune_tb
 import neptune
@@ -20,7 +21,7 @@ PARAMS = {
     "batch_size": 64,
     "l2_regularization_weight": 0.01,
     "layer_dropout": 0.3,
-    "layer_width": 128,
+    "layer_width": 20,
     "layer_depth": 3,
     "randomize_spins": True
 }
@@ -119,20 +120,45 @@ def feed_forward(training_data, training_labels, validation_data, validation_lab
     return model, hist_dict
 
 
-def feed_forward_residual(head,tail):
+def feed_forward_residual(head, tail):
     neptune.init("OneOneFour/Ising-Model")
     neptune_tb.integrate_with_tensorflow()
 
     ising_data = IsingData(train_ratio=5)
     ising_data.load_json(tail)
 
-    (train_data,train_labels),(test_data,test_labels),(val_data,val_labels) = ising_data.get_data()
+    (train_data, train_labels), (test_data, test_labels), (val_data, val_labels) = ising_data.get_data()
+
+    if PARAMS["randomize_spins"]:
+        train_data = np.array([t * -1 if np.random.uniform(0, 1) > 0.5 else t for t in train_data])
+        test_data = np.array([t * -1 if np.random.uniform(0, 1) > 0.5 else t for t in test_data])
+        val_data = np.array([t * -1 if np.random.uniform(0, 1) > 0.5 else t for t in val_data])
 
     with neptune.create_experiment(name=f"Residual feed forward") as exp:
-        pass
+        tb_callback = callbacks.TensorBoard(log_dir=f"logs\\ffn\\{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+        input = Input(shape=(ising_data.size, ising_data.size,))
+        flatten = layers.Flatten()(input)
+        first = layers.Dense(20, activation="relu")(flatten)
+        second = layers.Dense(20, activation="relu")(first)
+        transformation = layers.Dense(20)(first)
+        first_add = layers.add([transformation, second])
+        third = layers.Dense(20, activation="relu")(first_add)
+        second_transformation = layers.Dense(20)(first_add)
+        second_add = layers.add([third,second_transformation])
+        dropout = layers.Dropout(0.3)(second_add)
+        fourth = layers.Dense(1, activation="sigmoid")(dropout)
+        # out = layers.concatenate([fourth, flatten])
+        model = models.Model(inputs=input, outputs=fourth)
+
+        model.compile(optimizer="sgd", loss="binary_crossentropy", metrics=["accuracy"])
+        history = model.fit(train_data, train_labels, validation_data=(val_data, val_labels), epochs=50,
+                            callbacks=[tb_callback])
+
+        loss, acc = model.evaluate(test_data, test_labels)
+
+        return loss, acc
 
         # Randomise spins
-
 
 
 def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True, use_max=False):

@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import csv
-from ising_feed_forward import test_both, execute_feed_forward
+from ising_feed_forward import test_both, execute_feed_forward, feed_forward_residual
 from ising_convolutional import run_no_neptune
 from ising_convolutional import PARAMS as PARAMS_CONVO
 from ising_feed_forward import PARAMS as PARAMS_FFD
@@ -92,4 +92,8 @@ class IsingTest:
 
 
 if __name__ == "__main__":
-    pass
+    file = input("Enter Json file:")
+    head, tail = os.path.split(file)
+    os.chdir(os.path.join(os.getcwd(), head))
+
+    feed_forward_residual(head, tail)
