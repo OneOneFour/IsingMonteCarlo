@@ -72,7 +72,7 @@ class IsingLattice:
         return np.abs(magnetization / (self.size ** 2))
         # Flip the configuration spin
 
-    def __wolff_step(self, i=0, im=None,ax2=None, max_iter=0):
+    def __wolff_step(self, i=0, im=None, ax2=None, max_iter=0):
         '''
         Work using bonds as opposed to individual spins on the lattice. Converts problem to a percolation problem
         which unlike Metropolis does not fall in to inf relaxation time at the critical temperature. :return: Artist
@@ -100,9 +100,9 @@ class IsingLattice:
         else:
             return len(cluster) / self.size ** 2
 
-    def __metropolis_step(self, i=0, artists=None,ax2=None, max_iter=5000):
+    def __metropolis_step(self, i=0, im=None, max_iter=5000):
         for j in range(self.size ** 2):
-            if artists:
+            if im:
                 if i >= max_iter - 1:
                     plt.close()
                 # print(f"\rFrame:{f} of 5000", end='')
@@ -120,14 +120,9 @@ class IsingLattice:
                 self.m += (2 * self.lattice[rand_y][rand_x] / (self.size ** 2))
                 self.e += deltaE
 
-        if artists:
-            self.t.append(self.t[-1] + 1)
-            self.e_bar.append(self.e_bar[-1] + (self.e - self.e_bar[-1]) / len(self.e_bar))
-            artists[0].set_data(self.lattice)
-            artists[1].set_data(self.t, self.e_bar)
-            ax2.set_xlim(min(self.t),max(self.t))
-            ax2.set_ylim(min(self.e_bar) ,max(self.e_bar) )
-            return artists
+        if im:
+            im.set_data(self.lattice)
+            return im,
         return 1
 
     def start(self, method='metropolis', max_iter=5000, export_every=0, delay=0, log_correlation=False,
@@ -187,15 +182,13 @@ class IsingLattice:
 
     def start_animation(self, method='metropolis', max_iter=500000):
         import matplotlib.animation as animation
-        fig, (ax1, ax2) = plt.subplots(2, 1)
-        self.t = [0]
-        self.e_bar = [self.energy_periodic(self.lattice, self.size)]
-        im = ax1.imshow(self.lattice, cmap='jet', animated=True, vmin=-1, vmax=1)
-        line2, = ax2.plot(self.t, self.e_bar, 'b-')
+        fig, ax = plt.subplots()
+        ax.set_title(f"T:{round(self.kT,3)} ({'Supercritical' if self.critical else 'Subcritical'})")
+        im = ax.imshow(self.lattice, cmap='jet', animated=True, vmin=-1, vmax=1)
+        # line2, = ax2.plot(self.t, self.e_bar, 'b-')
 
-        artists = [im, line2]
         animation.FuncAnimation(fig, self.__wolff_step if method == 'wolff' else self.__metropolis_step,
-                                fargs=(artists, ax2,max_iter), blit=True,
+                                fargs=(im, max_iter), blit=True,
                                 frames=max_iter,
                                 interval=0,
                                 repeat=False)
@@ -409,14 +402,13 @@ if __name__ == '__main__':
     size = 50
     ttgen = IsingData(size=size)
     min_res = 10 / (4 * size)
-    kt = np.linspace(T_CRIT_ONS - min_res, T_CRIT_ONS + min_res, 2)
+    kt = np.linspace(2.1, 2.5, 20)
 
     M = []
     E = []
     C_v = []
     chi = []
-
-    if sys.argv[1] == "animate":
+    if len(sys.argv) > 1:
         for t in kt:
             print(f"Iterating at temperature: {t}")
             ising = IsingLattice(size, t, False)
@@ -425,7 +417,7 @@ if __name__ == '__main__':
         for t in kt:
             print(f"Iterating at temperature: {t}")
             ising = IsingLattice(size, t, t < T_CRIT_ONS)
-            e, m, e_var, m_var = ising.start('wolff', 5000, 0, 0)
+            e, m, e_var, m_var = ising.start('metropolis', 10000, 0, 0)
             # e,m,e_var,m_var = ising.start_animation('metropolis', 1000000)
             ttgen.add(ising.record_states, t, ising.critical)
             M.append(m)

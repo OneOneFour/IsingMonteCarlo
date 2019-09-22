@@ -51,6 +51,18 @@ def plot_9_sample(images, labels):
     plt.show()
 
 
+def plot_row_with_prediction(image, true_label, output):
+    fig, axes = plt.subplots(1, 3)
+    for i, ax in enumerate(fig.axes):
+        ax.imshow(image[i], cmap="binary")
+        ax.set_title(f"Label: {'Supercritical' if bool(true_label[i]) else 'Subcritical'}")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xlabel(
+            f"Prediction:{'Supercritical' if output[i] > 0.5 else 'Subcritical'} ({output[i] * 100 if output[i] > 0.5 else (1 - output[i]) * 100}%)")
+    plt.show()
+
+
 def plot_9_with_prediction(image, true_label, output):
     fig, axes = plt.subplots(3, 3)
     for i, ax in enumerate(fig.axes):
@@ -144,7 +156,7 @@ def feed_forward_residual(head, tail):
         first_add = layers.add([transformation, second])
         third = layers.Dense(20, activation="relu")(first_add)
         second_transformation = layers.Dense(20)(first_add)
-        second_add = layers.add([third,second_transformation])
+        second_add = layers.add([third, second_transformation])
         dropout = layers.Dropout(0.3)(second_add)
         fourth = layers.Dense(1, activation="sigmoid")(dropout)
         # out = layers.concatenate([fourth, flatten])
@@ -196,9 +208,9 @@ def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True, use_max
     model, hist_dict = feed_forward(train_images, train_labels, val_image, val_data, callback, ttsg.size)
 
     if plotspectrum:
-        pred_label = model.predict(test_images[:9])
-        plot_9_with_prediction(test_images[:9], test_labels[:9], pred_label)
-
+        pred_label = model.predict(test_images[:3])
+        # plot_9_with_prediction(test_images[:9], test_labels[:9], pred_label)
+        plot_row_with_prediction(test_images[:3], test_labels[:3], pred_label)
     max_acc = max(hist_dict["val_acc"])
 
     loss, acc = model.evaluate(test_images, test_labels)
@@ -302,4 +314,4 @@ if __name__ == '__main__':
             test_both(head, tail)
     else:
 
-        execute_feed_forward(head, tail)
+        execute_feed_forward(head, tail, plotspectrum=True, runneptune=False)

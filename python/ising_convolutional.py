@@ -2,7 +2,7 @@ import ast
 import sys
 import os
 from ising_feed_forward import plot_9_sample, plot_train_val_acc, plot_train_val_loss
-from tensorflow.python.keras import models, layers
+from tensorflow.python.keras import models, layers, Input
 from tensorflow.keras.callbacks import TensorBoard  # HAVE TO USE THIS NOT THE PYTHON ONE
 import tensorflow as tf
 from ising import IsingData
@@ -18,11 +18,11 @@ PARAMS = {
     "epochs": 50,
     "batch_size": 64,
     "periodic_padding": False,
-    "conv_depth": 2,
-    "conv_start_filters": 2,
-    "conv_increment": 2
+    "conv_depth": 4,
+    "conv_start_filters": 6,
+    "conv_increment": 2,
+    "residual_connection": False
 }
-
 
 def periodic_pad_numpy(x):
     assert x.shape[1] == x.shape[2]
@@ -49,22 +49,22 @@ def periodic_pad(x):
 
 
 def get_convolutional_network(shape, use_periodic_pad=False):
-    model = models.Sequential()
+    inputs = Input(shape=(shape, shape, 1))
+    x = inputs
     if use_periodic_pad:
-        model.add(layers.Lambda(periodic_pad))
-    model.add(layers.Conv2D(PARAMS["conv_start_filters"], (3, 3), activation='relu', input_shape=(shape, shape, 1)))
-    model.add(layers.MaxPooling2D((2, 2)))
-
-
+        x = layers.Lambda(periodic_pad)(x)
+    x = layers.Conv2D(PARAMS["conv_start_filters"], (3, 3), activation="relu")(x)
+    x = layers.MaxPooling2D((2, 2))(x)
     for i in range(1, PARAMS["conv_depth"]):
-        model.add(
-            layers.Conv2D(PARAMS["conv_start_filters"] + i * PARAMS["conv_increment"], (3, 3), activation='relu'))
-        model.add(layers.MaxPooling2D((2, 2)))
+        x_1 = layers.Conv2D(PARAMS["conv_start_filters"] + i * PARAMS["conv_increment"], (3, 3), activation='relu')(x)
+        x = layers.add([layers.Conv2D(PARAMS["conv_start_filters"] + i * PARAMS["conv_increment"], (3, 3))(x), x_1])
+        x = layers.MaxPooling2D((2, 2))(x)
 
-    model.add(layers.Flatten())
-    model.add(layers.Dense(128, activation='relu'))
-    model.add(layers.Dense(1, activation='sigmoid'))
-
+    x = layers.Flatten()(x)
+    x = layers.Dense(128, activation='relu')(x)
+    x = layers.Dropout(0.25)(x)
+    x = layers.Dense(1, activation='sigmoid')(x)
+    model = models.Model(inputs=inputs, outputs=x)
     return model
 
 
