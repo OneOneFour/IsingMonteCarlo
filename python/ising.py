@@ -329,7 +329,8 @@ class IsingData:
         max_e = max(max(energies_sub), max(energies_sup))
         n_sub, bins_sub, patches_sub = plt.hist(energies_sub, bins=bins, label="Subcritical", range=(min_e, max_e))
         n_sup, bins_sup, patches_sup = plt.hist(energies_sup, bins=bins, label="Supercritical", range=(min_e, max_e))
-
+        plt.xlabel("Energy")
+        plt.ylabel("Frequency")
         plt.legend()
         if fname is not None:
             plt.savefig(fname)

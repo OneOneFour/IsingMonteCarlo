@@ -182,7 +182,7 @@ def execute_feed_forward(head, tail, plotspectrum=True, runneptune=True, use_max
         exp = neptune.create_experiment(name=f"DFFN on {ttsg.size}x{ttsg.size} on file {tail}", params=PARAMS)
     if plotspectrum:
         e_overlap = ttsg.plot_energy_spectrum(20, "energy_spectrum.png")
-        m_overlap = ttsg.plot_magnetization_spectrum(20, "magnetization_spectrum.png")
+        #m_overlap = ttsg.plot_magnetization_spectrum(20, "magnetization_spectrum.png")
         if runneptune:
             energy_spectrum_img = Image.open("energy_spectrum.png")
             magnetization_spectrum_img = Image.open("magnetization_spectrum.png")
